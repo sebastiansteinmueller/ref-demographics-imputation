@@ -36,13 +36,13 @@ countries <- read_excel("data/World_Bureaus.xlsx") # iso codes with UNHCR region
 ##### II. Process and check data ##### 
 
 
-## first check of demographic data
+### first check of demographic data
 
 summary(dem) # x_unknown variables are empty, whereas x_other are populated
 glimpse(dem) # confirmed by DAS team: x_other are age unknowns
               
 
-## variable names
+### clean variable names in demographic dataset
 dem <- dem %>% 
   rename(
     year = Year,
@@ -87,18 +87,56 @@ dem <- dem %>%
   
 
 
-## merge m49 dataset with UNHCR region codes and clean variable names
+### merge m49 dataset with UNHCR region codes and clean variable names
 
-# check whether there are origin or asylum codes in demo data that are not in m49
+## check whether there are origin or asylum codes in demo data that are not in m49
 unhcr_iso3 <- unique(c(dem$origin_iso3, dem$asylum_iso3))
 
-unhcr_iso3_missingM49 <- unhcr_iso3[!(unhcr_iso3 %in% m49$`ISO-alpha3 Code`)] # "XXA" "TIB" (Stateless and Tibet)
-unhcr_iso3_missingWR <- unhcr_iso3[!(unhcr_iso3 %in% countries$iso3)] # "XXA" "TIB", NA (Stateless, Tibet, NA)
+unhcr_iso3_missingM49 <- unhcr_iso3[!(unhcr_iso3 %in% m49$`ISO-alpha3 Code`)] # "XXA" "TIB" (Stateless and Tibet) are in unhcr demographic data, but not in m49
+unhcr_iso3_missingCountries <- unhcr_iso3[!(unhcr_iso3 %in% countries$iso3)] # "XXA" "TIB", NA (Stateless, Tibet, Unknown) are in unhcr demographic data, but not in UNHCR country file
 
-# Stateless and Tibet: keep structure including those two codes in imputed dataset! 
-# covariates and regions: use those for China for all Tibet codes. for XXA and NA, set region to own "unknown" level, use means of covariates (distance and GDP) 
+countries_iso3_missingM49 <- countries$iso3[!(countries$iso3 %in% m49$`ISO-alpha3 Code`)] # "TWN", "XKX" (Taiwan, Kosovo) are in unhcr demographic data, but not in m49
+ 
+
+# Stateless and Tibet: keep structure including those two codes in imputed dataset
+# covariates and regions: use those for China for Tibet/Taiwan, Serbia for Kosovo. For XXA and NA, set region to own "unknown" level, use means of covariates (distance and GDP) 
 
 
+## add missing origins / asylum countries to m49 dataset
+m49 <- m49 %>% 
+  rename(
+    region="Region Name",
+    subregion="Sub-region Name",
+    country = "Country or Area",
+    m49 = "M49 Code",
+    iso3 = "ISO-alpha3 Code"
+  )  %>% 
+  select(region, subregion, country, m49, iso3) %>%
+  add_row(filter(., iso3 == "CHN") %>% mutate(iso3 = "TIB", country = "Tibet", m49 = 156)) %>%
+  add_row(filter(., iso3 == "CHN") %>% mutate(iso3 = "TWN", country = "Taiwan", m49 = 158)) %>% 
+  add_row(region = "Unknown", subregion = "Unknown", country = "Stateless", iso3 = "XXA", m49 = 997) %>% 
+  add_row(region = "Unknown", subregion = "Unknown", country = "Unknown", iso3 = "NAA", m49 = 998) %>% 
+  add_row(filter(., iso3 == "SRB") %>% mutate(iso3 = "XKX", country = "Kosovo", m49 = 412))
+
+## add missing origins / asylum countries to countries dataset
+countries <- countries %>% 
+  select(iso3, proGres_code, main_office_short, hcr_region, hcr_subregion) %>%
+  add_row(filter(., iso3 == "CHN") %>% mutate(iso3 = "TIB",  proGres_code = "TIB")) %>% 
+  add_row(main_office_short = "Unknown", hcr_region = "Unknown", hcr_subregion = "Unknown", iso3 = "XXA", proGres_code = "XXA") %>% 
+  add_row(main_office_short = "Unknown", hcr_region = "Unknown", hcr_subregion = "Unknown", iso3 = "NAA", proGres_code = "NAA")
+
+
+## create merge of m49 and countries files
+dim(m49)
+dim(countries)
+m49hcr <- m49 %>% 
+  left_join(countries, by = "iso3")
+dim(m49hcr)
+
+## substitute missing origin iso3 codes with NAA in demographic file
+
+dem <- dem %>% 
+  mutate(origin_iso3 = replace_na(origin_iso3, "NAA"))
 
 
 ## total checks
