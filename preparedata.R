@@ -120,6 +120,19 @@ dem <- dem %>%
   mutate(origin_iso3 = replace_na(origin_iso3, "NAA")) # replace missing origin iso3 codes with NAA
   
 
+### check missing age and sex counts and totals in demographic dataset
+
+dem <- dem %>% 
+  mutate(
+    sexSum = rowSums(select(.,female, male), na.rm = T),
+    sex_unknown = totalEndYear-sexSum # count of sex unknown
+  ) %>% 
+  mutate(
+    sexCheck = rowSums(select(., female, male, sex_unknown), na.rm = T),
+    sexDiff = totalEndYear - sexCheck
+  )
+
+
 
 ### merge m49 dataset with UNHCR region codes and clean variable names
 
@@ -169,7 +182,6 @@ m49hcr <- m49 %>%
 
 dim(m49hcr) # OK
 sum(duplicated(m49hcr$iso3)) # OK, no duplicates
-
 
 
 ## total checks
