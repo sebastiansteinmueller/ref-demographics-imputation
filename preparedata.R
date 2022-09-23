@@ -19,18 +19,50 @@ library(readxl)
 library(writexl)
 
 
-### data from UNHCR refugee data finder public database
-url <- paste( 'https://api.unhcr.org/population/v1/demographics/?limit=20&dataset=population&displayType=demographics&columns%5B%5D=refugees&columns%5B%5D=vda&yearFrom=2021&yearTo=2021&coo_all=true&coa_all=true&download=true')
-destfile = "data/query_data_end2021.zip"
+### download data from UNHCR refugee data finder public database
 
-if (!file.exists("data/demographics.csv")) {
-  download.file(url ,destfile, method = "curl", quiet = FALSE)
-  unzip(destfile, "demographics.csv", exdir = "data")
-  }
+## Venezuelans displaced abroad (VDA)
+vdaUrl <- paste('https://api.unhcr.org/population/v1/demographics/?limit=20&dataset=population&displayType=demographics&columns%5B%5D=vda&yearFrom=2021&yearTo=2021&coo_all=true&coa_all=true&download=true')
+vdaTemp <- tempfile()
+download.file(vdaUrl, vdaTemp,  method = "curl", mode="wb", quiet = FALSE)
 
-dem <- read_csv("data/demographics.csv", skip = 14) # end-2021 demographic table from https://www.unhcr.org/refugee-statistics/download/
+demvda <- read_csv(unz(vdaTemp, "demographics.csv"), skip = 14)
+unlink(vdaTemp)
+
+demvda <- demvda %>% 
+  mutate(popType = "VDA")
+
+
+## Refugees
+refUrl <- "https://api.unhcr.org/population/v1/demographics/?limit=20&dataset=population&displayType=demographics&columns%5B%5D=refugees&yearFrom=2021&yearTo=2021&coo_all=true&coa_all=true&download=true"
+refTemp <- tempfile()
+download.file(refUrl, refTemp,  method = "curl", mode="wb", quiet = FALSE)
+
+demref <- read_csv(unz(refTemp, "demographics.csv"), skip = 14)
+unlink(refTemp)
+
+demref <- demref %>% 
+  mutate(popType = "REF")
+
+
+## merge VDA and REF (keep popType variable to distinguish in dataset)
+dim(demref)
+dim(demvda)
+
+dem <- demref %>% 
+  full_join(demvda)
+
+dim(dem) # OK
+
+
+## country and region codes and names
 m49 <- read_excel("data/UNSD — Methodology.xlsx") # m49 codes and regions from https://unstats.un.org/unsd/methodology/m49/overview/
 countries <- read_excel("data/World_Bureaus.xlsx") # iso codes with UNHCR regions
+
+
+## remove variables and datasets not needed
+rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda"))
+
 
 
 ##### II. Process and check data ##### 
@@ -68,6 +100,7 @@ dem <- dem %>%
     year,
     origin_iso3,
     asylum_iso3,
+    popType,
     female_0_4,
     female_5_11,
     female_12_17,
@@ -83,7 +116,8 @@ dem <- dem %>%
     male_unknown,
     male,
     totalEndYear
-  )
+  ) %>% 
+  mutate(origin_iso3 = replace_na(origin_iso3, "NAA")) # replace missing origin iso3 codes with NAA
   
 
 
@@ -92,14 +126,14 @@ dem <- dem %>%
 ## check whether there are origin or asylum codes in demo data that are not in m49
 unhcr_iso3 <- unique(c(dem$origin_iso3, dem$asylum_iso3))
 
-unhcr_iso3_missingM49 <- unhcr_iso3[!(unhcr_iso3 %in% m49$`ISO-alpha3 Code`)] # "XXA" "TIB" (Stateless and Tibet) are in unhcr demographic data, but not in m49
-unhcr_iso3_missingCountries <- unhcr_iso3[!(unhcr_iso3 %in% countries$iso3)] # "XXA" "TIB", NA (Stateless, Tibet, Unknown) are in unhcr demographic data, but not in UNHCR country file
+unhcr_iso3_missingM49 <- unhcr_iso3[!(unhcr_iso3 %in% m49$`ISO-alpha3 Code`)] # "XXA" "TIB", "NAA" (Stateless and Tibet, Unknown) are in unhcr demographic data, but not in m49
+unhcr_iso3_missingCountries <- unhcr_iso3[!(unhcr_iso3 %in% countries$iso3)] # "XXA" "TIB", NAA (Stateless, Tibet, Unknown) are in unhcr demographic data, but not in UNHCR country file
 
 countries_iso3_missingM49 <- countries$iso3[!(countries$iso3 %in% m49$`ISO-alpha3 Code`)] # "TWN", "XKX" (Taiwan, Kosovo) are in unhcr demographic data, but not in m49
  
 
 # Stateless and Tibet: keep structure including those two codes in imputed dataset
-# covariates and regions: use those for China for Tibet/Taiwan, Serbia for Kosovo. For XXA and NA, set region to own "unknown" level, use means of covariates (distance and GDP) 
+# covariates and regions: use those for China for Tibet/Taiwan, Serbia for Kosovo. For XXA and NAA, set region to own "unknown" level, use means of covariates (distance and GDP) 
 
 
 ## add missing origins / asylum countries to m49 dataset
@@ -129,14 +163,13 @@ countries <- countries %>%
 ## create merge of m49 and countries files
 dim(m49)
 dim(countries)
+
 m49hcr <- m49 %>% 
   left_join(countries, by = "iso3")
-dim(m49hcr)
 
-## substitute missing origin iso3 codes with NAA in demographic file
+dim(m49hcr) # OK
+sum(duplicated(m49hcr$iso3)) # OK, no duplicates
 
-dem <- dem %>% 
-  mutate(origin_iso3 = replace_na(origin_iso3, "NAA"))
 
 
 ## total checks
