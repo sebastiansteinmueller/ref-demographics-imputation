@@ -65,7 +65,7 @@ rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda"))
 
 
 
-##### II. Process and check data ##### 
+##### II. Check demographic data and create variables for missingness structure ##### 
 
 
 ### first check of demographic data
@@ -122,16 +122,63 @@ dem <- dem %>%
 
 ### check missing age and sex counts and totals in demographic dataset
 
+## sex
 dem <- dem %>% 
   mutate(
-    sexSum = rowSums(select(.,female, male), na.rm = T),
-    sex_unknown = totalEndYear-sexSum # count of sex unknown
+    knownSexSum = rowSums(select(.,female, male), na.rm = T),
+    sexAge_unknown = totalEndYear-knownSexSum # count of sex and age unknown in this asylum/origin/popType combination
   ) %>% 
   mutate(
-    sexCheck = rowSums(select(., female, male, sex_unknown), na.rm = T),
-    sexDiff = totalEndYear - sexCheck
+    sexSum = rowSums(select(., female, male, sexAge_unknown), na.rm = T), # check of all possible counts for sex (female, male, unknown)
+    sexDiff = totalEndYear - sexSum # should be 0 (all accounted for in female, male or unknown)
   )
 
+summary(dem$sexDiff) # OK (all 0)
+
+dem <- dem %>% 
+  mutate(
+    female_known = rowSums(select(., female_0_4, female_5_11, female_12_17, female_18_59, female_60), na.rm = T)
+  ) %>% 
+  mutate(
+    femaleAgeSum = rowSums(select(., female_known, female_unknown), na.rm = T),
+    femaleAgeDiff = female - femaleAgeSum # should be 0 (all accounted for in age or unknown age)
+  ) %>% 
+  mutate(
+    male_known = rowSums(select(., male_0_4, male_5_11, male_12_17, male_18_59, male_60), na.rm = T)
+  ) %>%
+  mutate(
+    maleAgeSum = rowSums(select(., male_known, male_unknown), na.rm = T),
+    maleAgeDiff = male - maleAgeSum # should be 0 (all accounted for in age or unknown age)
+  ) 
+
+summary(dem$femaleAgeDiff) # OK
+summary(dem$maleAgeDiff) # OK
+
+
+dem <- dem %>% 
+  mutate(
+    age_unknown = rowSums(select(., female_unknown, male_unknown), na.rm = T), # count of age unknown, sex known in this asylum/origin/popType combination
+    sexAge_known = rowSums(select(., female_known, male_known), na.rm = T) # count of age and sex known in this asylum/origin/popType combination
+  ) %>%
+  mutate(
+    knownUnknownSum = rowSums(select(., sexAge_known, age_unknown, sexAge_unknown))
+  ) %>% 
+  mutate(
+    knownUnknownDiff = totalEndYear - knownUnknownSum # should be all 0
+  ) 
+
+
+summary(dem$knownUnknownDiff) # OK (all 0)
+
+# delete check variables
+
+dem <- dem %>% 
+  select(-c(knownSexSum, sexSum, sexDiff, femaleAgeSum, femaleAgeDiff, maleAgeSum, maleAgeDiff, 
+            knownUnknownSum, knownUnknownDiff))
+
+
+
+##### III. Merge m49 and UNHCR country information files into dataset m49hcr ##### 
 
 
 ### merge m49 dataset with UNHCR region codes and clean variable names
@@ -184,10 +231,50 @@ dim(m49hcr) # OK
 sum(duplicated(m49hcr$iso3)) # OK, no duplicates
 
 
-## total checks
+
+##### IV. Merge demographic dataset with m49hcr ##### 
+
+dim(dem)
+dim(m49hcr)
+
+## create m49hcr versions for origin and asylum country
+
+m49hcr_asylum <- m49hcr %>%
+  rename_with( ~ paste0("asylum_", .))
+
+m49hcr_origin <- m49hcr %>%
+  rename_with( ~ paste0("origin_", .))
 
 
+## merge with demographics dataset
 
-## 
+dem <- dem %>% 
+  left_join(m49hcr_asylum, by = "asylum_iso3") %>% 
+  left_join(m49hcr_origin, by = "origin_iso3")
+dim(dem) # OK
+
+# check whether NAs in asylum/origin variables
+
+table(dem$asylum_country, useNA = "ifany")
+table(dem$asylum_region, useNA = "ifany")
+table(dem$origin_country, useNA = "ifany")
+table(dem$origin_region, useNA = "ifany")
+# all OK
 
 
+##### V. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
+
+dem_longMissing <- dem %>% 
+  pivot_longer(cols = c(sexAge_known, age_unknown, sexAge_unknown),
+              names_to = "missingness",
+              values_to = "total") %>% 
+  filter(total > 0) %>% 
+  mutate()
+  
+## check totals and proportion of missingness 
+
+t.misProp <- dem_longMissing %>% group_by(missingness) %>% summarise(total = sum(total)) %>% mutate(prop = total/sum(total))
+t.popType.misProp <- dem_longMissing %>% group_by(popType, missingness) %>% summarise(total = sum(total)) %>% mutate(prop = total/sum(total))
+
+
+############################################ END ###########################################################
