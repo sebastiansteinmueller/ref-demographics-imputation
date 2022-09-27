@@ -85,14 +85,14 @@ dem <- dem %>%
     female_12_17 = 'Female 12 - 17',
     female_18_59 = 'Female 18 - 59',
     female_60 = 'Female 60',
-    female_unknown = 'f_other',
+    female_AgeUnknown = 'f_other',
     female = 'Female total',
     male_0_4 = 'Male 0 - 4',
     male_5_11 = 'Male 5 - 11',
     male_12_17 = 'Male 12 - 17',
     male_18_59 = 'Male 18 - 59',
     male_60 = 'Male 60',
-    male_unknown = 'm_other',
+    male_AgeUnknown = 'm_other',
     male = 'Male total',
     totalEndYear = 'Total'
   ) %>% 
@@ -106,14 +106,14 @@ dem <- dem %>%
     female_12_17,
     female_18_59,
     female_60,
-    female_unknown,
+    female_AgeUnknown,
     female,
     male_0_4,
     male_5_11,
     male_12_17,
     male_18_59,
     male_60,
-    male_unknown,
+    male_AgeUnknown,
     male,
     totalEndYear
   ) %>% 
@@ -137,17 +137,17 @@ summary(dem$sexDiff) # OK (all 0)
 
 dem <- dem %>% 
   mutate(
-    female_known = rowSums(select(., female_0_4, female_5_11, female_12_17, female_18_59, female_60), na.rm = T)
+    female_AgeKnown = rowSums(select(., female_0_4, female_5_11, female_12_17, female_18_59, female_60), na.rm = T)
   ) %>% 
   mutate(
-    femaleAgeSum = rowSums(select(., female_known, female_unknown), na.rm = T),
+    femaleAgeSum = rowSums(select(., female_AgeKnown, female_AgeUnknown), na.rm = T),
     femaleAgeDiff = female - femaleAgeSum # should be 0 (all accounted for in age or unknown age)
   ) %>% 
   mutate(
-    male_known = rowSums(select(., male_0_4, male_5_11, male_12_17, male_18_59, male_60), na.rm = T)
+    male_AgeKnown = rowSums(select(., male_0_4, male_5_11, male_12_17, male_18_59, male_60), na.rm = T)
   ) %>%
   mutate(
-    maleAgeSum = rowSums(select(., male_known, male_unknown), na.rm = T),
+    maleAgeSum = rowSums(select(., male_AgeKnown, male_AgeUnknown), na.rm = T),
     maleAgeDiff = male - maleAgeSum # should be 0 (all accounted for in age or unknown age)
   ) 
 
@@ -157,8 +157,8 @@ summary(dem$maleAgeDiff) # OK
 
 dem <- dem %>% 
   mutate(
-    age_unknown = rowSums(select(., female_unknown, male_unknown), na.rm = T), # count of age unknown, sex known in this asylum/origin/popType combination
-    sexAge_known = rowSums(select(., female_known, male_known), na.rm = T) # count of age and sex known in this asylum/origin/popType combination
+    age_unknown = rowSums(select(., female_AgeUnknown, male_AgeUnknown), na.rm = T), # count of age unknown, sex known in this asylum/origin/popType combination
+    sexAge_known = rowSums(select(., female_AgeKnown, male_AgeKnown), na.rm = T) # count of age and sex known in this asylum/origin/popType combination
   ) %>%
   mutate(
     knownUnknownSum = rowSums(select(., sexAge_known, age_unknown, sexAge_unknown))
@@ -265,16 +265,66 @@ table(dem$origin_region, useNA = "ifany")
 ##### V. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
 
 dem_longMissing <- dem %>% 
-  pivot_longer(cols = c(sexAge_known, age_unknown, sexAge_unknown),
-              names_to = "missingness",
+  pivot_longer(cols = c(sexAge_known, age_unknown, sexAge_unknown), # pivot to get separate missing/non-missing parts of dataframe for fit and predictions
+              names_to = "missing",
               values_to = "total") %>% 
-  filter(total > 0) %>% 
-  mutate()
+  mutate(missing = case_when( # sensible values for missing variable
+      missing == "sexAge_unknown" ~ "sexAge",
+      missing == "age_unknown" ~ "age",
+      missing == "sexAge_known" ~ "none"
+    )
+  ) %>%
+  filter(total > 0) %>% # keep only non-zero rows
+  mutate(across(c(male_0_4:male_60, female_0_4:female_60), # set age variables to NA if age unknown
+            ~ case_when(
+              missing == "sexAge" ~ NA_real_,
+              missing == "age" ~ NA_real_,
+              missing == "none" ~ .
+            )
+        )
+  ) %>% 
+  mutate(female = case_when( # set sex variables to NA if sex unknown, to number of unknown age in sex category if age only unknown, to number of known age if age known
+          missing == "sexAge" ~ NA_real_,
+          missing == "age" ~ female_AgeUnknown,
+          missing == "none" ~ female_AgeKnown
+        )
+  ) %>% 
+  mutate(male = case_when(
+    missing == "sexAge" ~ NA_real_,
+    missing == "age" ~ male_AgeUnknown,
+    missing == "none" ~ male_AgeKnown
+    )
+  ) %>% 
+  select(year, origin_iso3, origin_country, asylum_iso3, asylum_country, popType, missing, 
+         female_0_4:female_60, female, male_0_4:male_60, male, total, 
+         origin_region, origin_subregion, origin_m49:origin_hcr_subregion,
+         asylum_region, asylum_subregion, asylum_m49:asylum_hcr_subregion)
   
 ## check totals and proportion of missingness 
 
-t.misProp <- dem_longMissing %>% group_by(missingness) %>% summarise(total = sum(total)) %>% mutate(prop = total/sum(total))
-t.popType.misProp <- dem_longMissing %>% group_by(popType, missingness) %>% summarise(total = sum(total)) %>% mutate(prop = total/sum(total))
+# check headline totals against 2021 Global Trends
+t.total <- dem_longMissing %>% 
+  summarise(total = sum(total)) 
+
+t.totalPoptype <- dem_longMissing %>% 
+  group_by(popType) %>%
+  summarise(total = sum(total)) 
+
+t.totalRegion <- dem_longMissing %>% 
+  group_by(asylum_hcr_region) %>%
+  summarise(total = sum(total)) 
+
+
+# check missingness proportion
+t.misProp <- dem_longMissing %>% 
+  group_by(missing) %>% 
+  summarise(total = sum(total)) %>% 
+  mutate(prop = total/sum(total))
+
+t.popType.misProp <- dem_longMissing %>% 
+  group_by(popType, missing) %>% 
+  summarise(total = sum(total)) %>% 
+  mutate(prop = total/sum(total))
 
 
 ############################################ END ###########################################################
