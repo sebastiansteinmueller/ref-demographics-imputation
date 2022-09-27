@@ -300,31 +300,58 @@ dem_longMissing <- dem %>%
          origin_region, origin_subregion, origin_m49:origin_hcr_subregion,
          asylum_region, asylum_subregion, asylum_m49:asylum_hcr_subregion)
   
-## check totals and proportion of missingness 
 
-# check headline totals against 2021 Global Trends
-t.total <- dem_longMissing %>% 
-  summarise(total = sum(total)) 
+##### VI. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
 
-t.totalPoptype <- dem_longMissing %>% 
+## internal consistency
+
+# for age and sex available: do age categories add up to count in sex category?
+t.ageSexCheck <- dem_longMissing %>% 
+  filter(missing == "none") %>% 
+  mutate(female_AgeKnown = rowSums(select(., female_0_4, female_5_11, female_12_17, female_18_59, female_60), na.rm = T),
+         male_AgeKnown = rowSums(select(., male_0_4, male_5_11, male_12_17, male_18_59, male_60), na.rm = T)) %>% 
+  mutate(femaleAgeDiff = female - female_AgeKnown,
+         maleAgeDiff = male - male_AgeKnown) %>% 
+  summarise(across(c(femaleAgeDiff, maleAgeDiff), ~summary(.))) # OK (all 0, age categories add up to sex category)
+
+# for age and sex or only available: do male/female add up to total count?
+t.sexTotalCheck <- dem_longMissing %>% 
+  filter(missing == "none" | missing == "age") %>% 
+  mutate(sexKnown = rowSums(select(., female, male), na.rm = T)) %>% 
+  mutate(sexDiff = total - sexKnown) %>% 
+  summarise(sexDiff = summary(sexDiff)) # OK (all 0, male/female add up to total)
+
+
+
+## check headline totals against 2021 Global Trends and refugee data finder 
+t.total <- dem_longMissing %>% # ref finder: 25,733,717
+  summarise(total = sum(total)) # OK
+
+t.totalPoptype <- dem_longMissing %>% # GT 21.3M ref, 4.4M VDA, ref finder: 21,327,285 ref, 4,406,432 VDA
   group_by(popType) %>%
-  summarise(total = sum(total)) 
+  summarise(total = sum(total)) # OK
 
-t.totalRegion <- dem_longMissing %>% 
-  group_by(asylum_hcr_region) %>%
-  summarise(total = sum(total)) 
+t.totalRegion <- dem_longMissing %>% # checked against table 1 in GT 2021
+  group_by(popType, asylum_hcr_region) %>%
+  summarise(total = sum(total)) # OK (rounding errors in GT table)
 
 
-# check missingness proportion
+## check missingness proportion
 t.misProp <- dem_longMissing %>% 
   group_by(missing) %>% 
   summarise(total = sum(total)) %>% 
-  mutate(prop = total/sum(total))
+  mutate(prop = total/sum(total)) 
 
-t.popType.misProp <- dem_longMissing %>% 
+t.popType.misProp <- dem_longMissing %>% # GT 2021: "For example, demographic data by age and sex is available for 84 per cent of refugees and 42 per cent of Venezuelans displaced abroad at the end of 2021"
   group_by(popType, missing) %>% 
   summarise(total = sum(total)) %>% 
-  mutate(prop = total/sum(total))
+  mutate(prop = total/sum(total)) # OK, same as GT
+
+
+##### VII. Save dataset in data folder ##### 
+
+
+save(dem_longMissing, m49hcr, dem, file = "data/dem_refvda_end2021.RData")
 
 
 ############################################ END ###########################################################
