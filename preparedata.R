@@ -351,7 +351,7 @@ t.popType.misProp <- dem_longMissing %>% # GT 2021: "For example, demographic da
 ##### VII. Save dataset in data folder ##### 
 
 
-save(dem_longMissing, m49hcr, dem, file = "data/dem_refvda_end2021.RData")
+save(dem_longMissing, m49hcr, file = "data/dem_refvda_end2021.RData")
 
 
 ############################################ END ###########################################################
