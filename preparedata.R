@@ -59,9 +59,19 @@ dim(dem) # OK
 m49 <- read_excel("data/UNSD — Methodology.xlsx") # m49 codes and regions from https://unstats.un.org/unsd/methodology/m49/overview/
 countries <- read_excel("data/World_Bureaus.xlsx") # iso codes with UNHCR regions
 
+## neighbour matrix
+load("data/neighbor.RData")
+
+## distance matrix
+load("data/distance.RData")
+rm(distance_matrix)
+
+## GNI difference matrix
+load("data/GNI_diff.RData")
 
 ## remove variables and datasets not needed
-rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda"))
+rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda", "distance_matrix"))
+
 
 
 
@@ -262,7 +272,33 @@ table(dem$origin_region, useNA = "ifany")
 # all OK
 
 
-##### V. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
+##### V. Merge distance and GNI covariates to dataset ##### 
+
+### checks: are all origin/asylum combinations from dem available in distance, neighbour and GNI datasets without missings?
+
+iso3_pairs <- unique(dem %>% unite("iso3_pairs", origin_iso3, asylum_iso3) %>% select(iso3_pairs)) # all origin-asylum pairs in dem
+
+
+## check neighbours
+
+
+
+## check distance
+distance_pairs <- unique(unlist(distance_df_long %>% unite("iso3_pairs", orig_iso3, dest_iso3) %>% select(iso3_pairs)))
+
+check_distance <- iso3_pairs %>% 
+  filter(!(iso3_pairs %in% distance_pairs)) # OK (only stateless and unknown origin missing in distance matrix)
+
+## check gni
+gni_pairs <- unique(unlist(gni_diff_long %>% unite("iso3_pairs", orig_iso3, dest_iso3) %>% select(iso3_pairs)))
+
+check_gni <- iso3_pairs %>% 
+  filter(!(iso3_pairs %in% gni_pairs)) # OK (only stateless and unknown origin missing in gni matrix)
+
+
+
+
+##### VI. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
 
 dem_longMissing <- dem %>% 
   pivot_longer(cols = c(sexAge_known, age_unknown, sexAge_unknown), # pivot to get separate missing/non-missing parts of dataframe for fit and predictions
