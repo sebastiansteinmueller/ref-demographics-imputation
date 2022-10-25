@@ -276,7 +276,7 @@ table(dem$origin_region, useNA = "ifany")
 
 ### checks: are all origin/asylum combinations from dem available in distance, neighbour and GNI datasets without missings?
 
-iso3_pairs <- unique(dem %>% unite("iso3_pairs", origin_iso3, asylum_iso3) %>% select(iso3_pairs)) # all origin-asylum pairs in dem
+pairs_iso3 <- unique(dem %>% unite("pairs_iso3", origin_iso3, asylum_iso3) %>% select(pairs_iso3)) # all origin-asylum pairs in dem
 
 
 ## check neighbours
@@ -291,18 +291,50 @@ check_neighbour_asy <- dem %>%
 
 
 ## check distance
-distance_pairs <- unique(unlist(distance_df_long %>% unite("iso3_pairs", orig_iso3, dest_iso3) %>% select(iso3_pairs)))
+distance_pairs <- unique(unlist(distance_df_long %>% unite("pairs_iso3", orig_iso3, dest_iso3) %>% select(pairs_iso3)))
 
-check_distance <- iso3_pairs %>% 
-  filter(!(iso3_pairs %in% distance_pairs)) # OK (only stateless and unknown origin missing in distance matrix)
+check_distance <- pairs_iso3 %>% 
+  filter(!(pairs_iso3 %in% distance_pairs)) # OK (only stateless and unknown origin missing in distance matrix)
 
 ## check gni
-gni_pairs <- unique(unlist(gni_diff_long %>% unite("iso3_pairs", orig_iso3, dest_iso3) %>% select(iso3_pairs)))
+gni_pairs <- unique(unlist(gni_diff_long %>% unite("pairs_iso3", orig_iso3, dest_iso3) %>% select(pairs_iso3)))
 
-check_gni <- iso3_pairs %>% 
-  filter(!(iso3_pairs %in% gni_pairs)) # OK (only stateless and unknown origin missing in gni matrix)
+check_gni <- pairs_iso3 %>% 
+  filter(!(pairs_iso3 %in% gni_pairs)) # OK (only stateless and unknown origin missing in gni matrix)
 
 
+### merge covariates to dem
+
+dem <- dem %>% 
+  unite("pairs_iso3", origin_iso3, asylum_iso3, remove = F) %>% 
+  left_join(
+    all.neighbors %>% # neighbours
+      unite("pairs_iso3", country_iso3, neighbor_iso3) %>% 
+      mutate(neighbor = "Yes"),
+    by = "pairs_iso3"
+  ) %>% 
+  mutate(neighbor = replace_na(neighbor, "No")) %>%
+  mutate(neighbor = factor(neighbor, levels = c("Yes", "No"))) %>% 
+  left_join( # distance
+    distance_df_long %>% 
+      select(orig_iso3, dest_iso3, distance) %>%
+      unite("pairs_iso3", orig_iso3, dest_iso3),
+    by = "pairs_iso3"
+  ) %>% 
+  left_join( # GNI
+    gni_diff_long %>% 
+      select(orig_iso3, dest_iso3, orig_gni, dest_gni, gni_diff) %>%
+      rename(gni_origin = orig_gni,
+             gni_asylum = dest_gni) %>%
+      unite("pairs_iso3", orig_iso3, dest_iso3),
+    by = "pairs_iso3"
+  ) 
+
+
+### for missing values of distance, GNI and GNI difference (stateless and unknown origins), impute population-weighted mean of refugees/VDA with known origin by country of asylum
+
+
+  
 
 
 ##### VI. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
@@ -344,7 +376,7 @@ dem_longMissing <- dem %>%
          asylum_region, asylum_subregion, asylum_m49:asylum_hcr_subregion)
   
 
-##### VI. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
+##### VII. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
 
 ## internal consistency
 
@@ -391,7 +423,7 @@ t.popType.misProp <- dem_longMissing %>% # GT 2021: "For example, demographic da
   mutate(prop = total/sum(total)) # OK, same as GT
 
 
-##### VII. Save dataset in data folder ##### 
+##### VIII. Save dataset in data folder ##### 
 
 
 save(dem_longMissing, m49hcr, file = "data/dem_refvda_end2021.RData")
