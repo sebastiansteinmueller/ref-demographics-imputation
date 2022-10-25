@@ -280,7 +280,14 @@ iso3_pairs <- unique(dem %>% unite("iso3_pairs", origin_iso3, asylum_iso3) %>% s
 
 
 ## check neighbours
+# are all origins in the neighbour matrix?
+neighbour_ori_iso3 <- unique(all.neighbors$country_iso3)
+check_neighbour_ori <- dem %>% 
+  filter(!(origin_iso3 %in% neighbour_ori_iso3)) # OK (islands, stateless, unknown)
 
+neighbour_asy_iso3 <- unique(all.neighbors$neighbor_iso3) 
+check_neighbour_asy <- dem %>% 
+  filter(!(asylum_iso3 %in% neighbour_asy_iso3)) # OK (islands)
 
 
 ## check distance
