@@ -305,6 +305,7 @@ check_gni <- pairs_iso3 %>%
 
 ### merge covariates to dem
 
+dim(dem)
 dem <- dem %>% 
   unite("pairs_iso3", origin_iso3, asylum_iso3, remove = F) %>% 
   left_join(
@@ -314,27 +315,53 @@ dem <- dem %>%
     by = "pairs_iso3"
   ) %>% 
   mutate(neighbor = replace_na(neighbor, "No")) %>%
-  mutate(neighbor = factor(neighbor, levels = c("Yes", "No"))) %>% 
   left_join( # distance
     distance_df_long %>% 
       select(orig_iso3, dest_iso3, distance) %>%
       unite("pairs_iso3", orig_iso3, dest_iso3),
     by = "pairs_iso3"
   ) %>% 
-  left_join( # GNI
+  left_join( # GNI difference and origin
     gni_diff_long %>% 
-      select(orig_iso3, dest_iso3, orig_gni, dest_gni, gni_diff) %>%
-      rename(gni_origin = orig_gni,
-             gni_asylum = dest_gni) %>%
+      select(orig_iso3, dest_iso3, orig_gni, gni_diff) %>%
+      rename(gni_origin = orig_gni) %>%
       unite("pairs_iso3", orig_iso3, dest_iso3),
     by = "pairs_iso3"
+  )  %>% 
+  left_join( # GNI by asylum
+    gni_diff_long %>% 
+      select(dest_iso3, dest_gni) %>%
+      distinct() %>%
+      rename(gni_asylum = dest_gni),
+    by = c("asylum_iso3"="dest_iso3")
   ) 
+dim(dem)
 
+### for missing values of distance, GNI by origin and GNI difference (stateless and unknown origins), impute population-weighted mean of refugees/VDA with known origin by country of asylum
 
-### for missing values of distance, GNI and GNI difference (stateless and unknown origins), impute population-weighted mean of refugees/VDA with known origin by country of asylum
+dem <- dem %>% 
+  group_by(asylum_iso3) %>%
+  mutate(distanceAsyMeanW = weighted.mean(distance, w=totalEndYear, na.rm=T),
+         gni_originAsyMeanW = weighted.mean(gni_origin, w=totalEndYear, na.rm=T),
+         gni_diffAsyMeanW = weighted.mean(gni_diff, w=totalEndYear, na.rm=T)
+        ) %>% 
+  ungroup() %>% 
+  mutate(distance = case_when(
+           is.na(distance) ~ distanceAsyMeanW,
+           !(is.na(distance)) ~ distance
+          ),
+         gni_origin = case_when(
+           is.na(gni_origin) ~ gni_originAsyMeanW,
+           !(is.na(gni_origin)) ~ gni_origin
+         ),
+         gni_diff = case_when(
+           is.na(gni_diff) ~ gni_diffAsyMeanW,
+           !(is.na(gni_diff)) ~ gni_diff
+         )
+  ) %>% 
+  select(-c(distanceAsyMeanW, gni_originAsyMeanW, gni_diffAsyMeanW))
 
-
-  
+dim(dem %>% filter(is.na(distance)|is.na(gni_asylum)|is.na(gni_origin)|is.na(gni_diff))) # OK (empty)
 
 
 ##### VI. Create long dataset with one row per asylum/origin/poptype combination and missingness type ##### 
@@ -373,7 +400,11 @@ dem_longMissing <- dem %>%
   select(year, origin_iso3, origin_country, asylum_iso3, asylum_country, popType, missing, 
          female_0_4:female_60, female, male_0_4:male_60, male, total, 
          origin_region, origin_subregion, origin_m49:origin_hcr_subregion,
-         asylum_region, asylum_subregion, asylum_m49:asylum_hcr_subregion)
+         asylum_region, asylum_subregion, asylum_m49:asylum_hcr_subregion, 
+         neighbor:gni_asylum) %>% 
+  mutate(across(c(origin_iso3:missing, origin_region:asylum_hcr_subregion), factor)) %>%
+  mutate(neighbor = factor(neighbor, levels = c("Yes", "No"))) %>%
+  mutate(year = as.integer(year))
   
 
 ##### VII. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
