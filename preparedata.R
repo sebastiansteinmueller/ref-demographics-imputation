@@ -6,10 +6,6 @@
 #### Project: Demographic models end-2021
 #### Description: Data preparation of ASR 2021 REF + VDA demographic data for imputation model
 
-
-rm(list=ls()) # clear workspace
-
-
 ##### I. Read data, packages etc ##### 
 
 ### packages
@@ -70,7 +66,7 @@ rm(distance_matrix)
 load("data/GNI_diff.RData")
 
 ## remove variables and datasets not needed
-rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda", "distance_matrix"))
+rm(list=c("refTemp", "vdaTemp", "refUrl", "vdaUrl", "demref", "demvda"))
 
 
 
@@ -95,14 +91,14 @@ dem <- dem %>%
     female_12_17 = 'Female 12 - 17',
     female_18_59 = 'Female 18 - 59',
     female_60 = 'Female 60',
-    female_AgeUnknown = 'f_other',
+    female_AgeUnknown = 'Female other',
     female = 'Female total',
     male_0_4 = 'Male 0 - 4',
     male_5_11 = 'Male 5 - 11',
     male_12_17 = 'Male 12 - 17',
     male_18_59 = 'Male 18 - 59',
     male_60 = 'Male 60',
-    male_AgeUnknown = 'm_other',
+    male_AgeUnknown = 'Male other',
     male = 'Male total',
     totalEndYear = 'Total'
   ) %>% 
@@ -455,7 +451,6 @@ t.popType.misProp <- dem_longMissing %>% # GT 2021: "For example, demographic da
 
 
 ##### VIII. Save dataset in data folder ##### 
-
 
 save(dem_longMissing, m49hcr, file = "data/dem_refvda_end2021.RData")
 

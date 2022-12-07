@@ -1,0 +1,327 @@
+---
+title: "Descriptives and model description"
+format: pdf
+execute:
+  echo: false
+---
+
+## Dataset
+
+```{r}
+#| include: false
+#| 
+##### I. Read data, packages etc ##### 
+
+### packages
+library(tidyverse)
+library(stringi)
+library(gt)
+library(ggplot2)
+
+### read dataset
+load("data/dem_refvda_end2021.RData")
+
+## colours (https://intranet.unhcr.org/content/dam/unhcr/intranet/staff%20support/strategic/documents/english/brand-book/UNHCR-Brand%20Book.pdf)
+unhcrPaletteBlue <- c("#0072BC", "#338EC9", "#66AAD7", "#99C7E4", "#CCE3F2")
+unhcrPaletteBlack <- c("#000000", "#333333", "#666666", "#999999", "#CCCCCC")
+unhcrPaletteYellow <- c("#FAEB00", "#FBEF33", "#FCF366", "#FDF799", "#FEFBCC")
+unhcrPaletteWhite <- c("#FFFFFF")
+unhcrPaletteRed <- c("#E73451")
+unhcrPaletteGreen <- c("#00AB92")
+
+```
+
+```{r}
+# plot hierarchies and covariates
+
+
+dem_longMissing <- dem_longMissing %>%
+  mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
+                            male_0_4, male_5_11, male_12_17)),
+         childrenProp = children/total,
+         femaleProp = female/total,
+         )
+
+
+p.children.gni <- ggplot(data = dem_longMissing %>% 
+                       filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none"),
+       aes(x = gni_diff, y = childrenProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+p.female.gni <- ggplot(data = dem_longMissing %>% 
+                       filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none"),
+       aes(x = gni_diff, y = femaleProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+
+p.children.dist <- ggplot(data = dem_longMissing %>% 
+                       filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none"),
+       aes(x = distance, y = childrenProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+p.female.dist <- ggplot(data = dem_longMissing %>% 
+                       filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none"),
+       aes(x = distance, y = femaleProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+
+```
+
+## Testing viability of intercept model workflow
+
+The country-pair dataset contains three types of missingness across sex-/age counts:
+
+i.  Neither age nor sex counts missing, i.e. complete observations
+
+ii. Age counts missing, female and male counts available
+
+iii. Both age and sex counts missing
+
+```{r}
+# missingness 
+# example data
+t.missing <- dem_longMissing %>% 
+  group_by(missing) %>%
+  summarise(
+    `Number of refugees` = sum(total),
+    `Number of country pairs` = n()
+  ) %>%
+  ungroup() %>% 
+    mutate(`Type of missingness` = case_when(
+      missing == "none" ~ "i) None",
+      missing == "age" ~ "ii) Age missing",
+      missing == "sexAge" ~ "iii) Age and sex missing"
+    )
+  ) %>%
+  select(`Type of missingness`, `Number of refugees`, `Number of country pairs`) %>%
+  arrange(`Type of missingness`)
+
+# t.missing %>%
+#   gt() 
+
+
+t.missing.testdem <- testdem %>% 
+  group_by(missing) %>%
+  summarise(
+    `Number of refugees` = sum(total),
+    `Number of country pairs` = n()
+  ) %>%
+  ungroup() %>% 
+    mutate(`Type of missingness` = case_when(
+      missing == "none" ~ "i) None",
+      missing == "age" ~ "ii) Age missing",
+      missing == "sexAge" ~ "iii) Age and sex missing"
+    )
+  ) %>%
+  select(`Type of missingness`, `Number of refugees`, `Number of country pairs`) %>%
+  arrange(`Type of missingness`)
+
+
+## create type i, ii and iii datasets
+
+testdem1 <- testdem %>% 
+  filter(missing %in% c("none"))
+
+testdem2 <- testdem %>% 
+  filter(missing %in% c("age"))
+
+testdem3 <- testdem %>% 
+  filter(missing %in% c("sexAge"))
+
+```
+
+Estimating combined age-/sex counts with type i) data and drawing from the posterior predictive distribution to impute age-/sex counts for type ii) and iii) country pairs is straightforward in a single multinomial model with 10 categories, i.e. two sex- times five age-categories. However, this approach ignores the available female and male counts in type ii) data and thereby discards information. It is preferable to use all available data and restrict predicted sex-specific age counts of type ii) data so they sum up to the actually observed female and male counts.
+
+This means we need to fit two multinomial models (M_male and M_female) to predict sex-specific age counts for type ii) and iii) data, one for female and one for male refugees per country pair. Furthermore, it requires prediction of female and male counts for type iii) data in a first model M0. It would theoretically be possible to use point parameter estimates from this model M0 to calculate expected single values of the number of female and male refugees for the second step, predicting sex-specific age counts with the multinomial models M_male and M_female. While easy to implement, we would be ignoring uncertainty from predicting female and male counts in type iii) data. Instead, we will combine multiple imputations of the dataset with predicted female and male counts from M0 as input data for M_male and M_female to account for predictive and model uncertainty from M0.
+
+Summary of the modelling workflow:
+
+1.  Using type i) and ii) data, estimate the proportion of female and male refugees per country pair in a binomial model M0.
+
+2.  Draw m imputations from the posterior predictive distribution of M0 to predict female and male counts in type iii) data.
+
+3.  Combine type ii) data with observed female/male counts and the m multiple imputations for type iii) data from step 2 to obtain m datasets to be used as new data in predictions.
+
+4.  Using type i) data, fit two multinomial models M_female and M_male to estimate sex-specific age distribution.
+
+5.  Using the multiple imputations of the age-missing dataset from step 3 as new data, draw l realisations for each of the m datasets from the posterior predictive distributions of M_female and M_male to obtain k=l\*m age/sex imputed final datasets.
+
+### Model M0 to predict missing female and male counts
+
+```{r}
+# test viable binomial intercept model M0 with example data
+set.seed(1554)
+
+# m0.test <- brm(female | trials(total) ~ 1,
+#                     family = binomial(link = "logit"),
+#                     data = testdem %>% filter(missing %in% c("none", "age")))
+# saveRDS(m0.test, file = "models/m0.test.rds")
+m0.test <- readRDS("models/m0.test.rds")
+
+# draw m=5 posterior predictions for type iii) data 
+m0.test.pred <- testdem3 %>%
+  add_predicted_draws(m0.test, ndraws = 5)
+# summary(m0.test)
+
+# add predictions as female counts and calculate male counts
+m0.test.pred <- m0.test.pred %>% 
+  mutate(female = .prediction) %>%
+  mutate(male = total-female) %>%
+  rename(.m0draw = .draw) %>%
+  select(-c(.chain, .iteration, .prediction))
+
+# combine with type ii) data
+dim(m0.test.pred)
+dim(testdem2)
+
+# add same type ii) dataset for each imputation
+testdem.newdata <- m0.test.pred %>% 
+  group_by(.m0draw)  %>% 
+  group_modify(
+    ~ bind_rows(.x, testdem2)
+  )
+
+# check that newdata adds up to totals for type ii) and iii)
+
+t.missing.newdata <- testdem.newdata %>% 
+  group_by(.m0draw, missing) %>%
+  summarise(
+    `Number of refugees` = sum(total),
+    `Number of country pairs` = n()
+  )
+# OK 
+
+```
+
+### Models M_female and M_male to predict missing age counts
+
+```{r}
+# test viable multinomial intercept models M_female and M_male with example data 
+
+set.seed(1638)
+
+# create multinomial count sets for female and male ages
+testdem$femaleAge  <- with(testdem, cbind(female_0_4, female_5_11, female_12_17, female_18_59, female_60))
+testdem$maleAge  <- with(testdem, cbind(male_0_4, male_5_11, male_12_17, male_18_59, male_60))
+
+# multivariate multinomial model for sex-specific age counts
+# m.fm.test <- brm(bf(femaleAge|trials(female) ~ 1) +
+#                   bf(maleAge|trials(male) ~ 1) +
+#                   set_rescor(FALSE),
+#                   family = multinomial(link = "logit"),
+#                   data = testdem %>% filter(missing %in% c("none")))
+# saveRDS(m.fm.test, file = "models/m.fm.test.rds")
+m.fm.test <- readRDS("models/m.fm.test.rds")
+
+# draw l=10 posterior predictions per imputation of type ii) and iii) data 
+m.fm.test.pred <- testdem.newdata %>% 
+      group_by(.m0draw) %>%
+      group_modify(
+      ~bind_rows(
+      add_predicted_draws(m.fm.test, 
+                          newdata = .x, 
+                          ndraws = 10)
+        )
+      ) %>%
+  rename(.fmdraw = .draw) %>% # rename draws from fm model 
+  unite(".draw", c(.m0draw, .fmdraw), remove = F) # combine draw ids from m0 and m.fm to create unique draw variable
+
+drawkey <- setNames(c(1:length(unique(m.fm.test.pred$.draw))), unique(m.fm.test.pred$.draw)) 
+
+m.fm.test.pred <- m.fm.test.pred %>%
+  mutate(.draw=recode(.draw, !!!drawkey, default = NA_integer_)) # convert draw to numeric variable
+
+# check draws and totals add up. 5 m0draws with 10 .draws each
+
+t.m.fm.test.pred.m0 <- m.fm.test.pred %>% 
+  group_by(.m0draw, origin_iso3, asylum_iso3, popType, missing) %>% 
+  summarise(n = n(), # check: should be 100 (10 mfdraw * 10 age/sex brackets) per country pair / datatype row. OK
+            femaleSd = sd(female),
+            maleSd = sd(male)) %>% 
+  arrange(desc(femaleSd)) # check: sd of female/male within one country pair/datatype row and m0draw should always be 0. OK
+  
+
+```
+
+
+
+```{r}
+# pivot draws to wide format (age/sex categories as columns instead of rows)
+m.fm.test.pred.wide <- m.fm.test.pred %>%
+  ungroup() %>%
+  pivot_wider(values_from = .prediction, 
+              names_from = .category, 
+              id_cols = c(.draw, .m0draw, .fmdraw, 
+                          year:missing, 
+                          female, male, 
+                          total:gni_asylum)
+              )
+
+
+# merge type i) data with full age/sex observations to posterior draws from m0/m.fm
+dim(m.fm.test.pred.wide)
+dim(testdem1)
+postpred <- m.fm.test.pred.wide %>%
+  group_by(.draw) %>% 
+  group_modify(
+    ~bind_rows(.x, testdem1) # add full type 1 dataset to each draw
+  )
+dim(postpred)
+
+
+# check row sums
+
+postpred <- postpred %>% 
+  ungroup() %>%
+  mutate(sexSum = rowSums(select(., female, male)),
+         ageSum = rowSums(select(., female_0_4:male_60)),
+         ageFemaleSum = rowSums(select(., female_0_4:female_60)),
+         ageMaleSum = rowSums(select(., male_0_4:male_60))
+  ) %>%
+  mutate(
+    totalSexDiff = total-sexSum,
+    totalAgeDiff = total-ageSum,
+    femaleDiff = female-ageFemaleSum,
+    maleDiff = male-ageMaleSum
+  )
+
+t.postpred.checkSums <- postpred %>% 
+  ungroup() %>%
+  summarise(across(totalSexDiff:maleDiff,
+            list(mean=mean, sd=sd))) # OK, all 0
+
+# check variance over draws
+
+t.postpred.checkVar <- postpred %>% 
+  group_by(origin_iso3, asylum_iso3, popType, missing) %>% 
+  summarise(across(c(total, female, male, female_0_4:male_60),
+            list(mean = mean, sd = sd))) %>% 
+  arrange(missing)
+  
+t.postpred.checkVarSummary <- t.postpred.checkVar %>% 
+  ungroup() %>% 
+  group_by(missing) %>% 
+  summarise(across(contains("_sd"), 
+                   list(sum = sum))) # OK (varies in the correct columns by missing status)
+
+```
