@@ -34,13 +34,20 @@ unhcrPaletteGreen <- c("#00AB92")
 ```{r}
 # plot hierarchies and covariates
 
-
+# Calculate the proportions of children and girls/women
 dem_longMissing <- dem_longMissing %>%
   mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
                             male_0_4, male_5_11, male_12_17)),
          childrenProp = children/total,
          femaleProp = female/total,
          )
+
+# Get the 9 largest origin_iso3 by total
+top_origin_iso3 <- dem_longMissing %>%
+  group_by(origin_iso3) %>%
+  summarize(total = sum(total)) %>%
+  arrange(desc(total)) %>%
+  top_n(9)
 
 
 p.children.gni <- ggplot(data = dem_longMissing %>% 
