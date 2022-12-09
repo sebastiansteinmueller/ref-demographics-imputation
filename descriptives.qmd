@@ -18,6 +18,7 @@ library(stringi)
 library(gt)
 library(ggplot2)
 library(patchwork)
+library(scales)
 
 ### read dataset
 load("data/dem_refvda_end2021.RData")
@@ -120,9 +121,16 @@ p.oriregion.missingAge1 <- ggplot(data = t.oriregion.missingAge %>%
   geom_bar(stat="identity") +
   scale_fill_manual(values=c(unhcrPaletteBlue[1], unhcrPaletteGreen[1])) +
   ggtitle("Age data available") +
+  labs(y = "Number of refugees")  +
   ylim(c(NA,5000000)) +
-  theme(legend.position = "bottom") +
-  theme_minimal()
+  theme(legend.title = element_blank(), legend.position = "bottom") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 16),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16),
+        panel.grid.major.x = element_blank()) 
   
 
 
@@ -130,12 +138,21 @@ p.oriregion.missingAge2 <- ggplot(data = t.oriregion.missingAge %>%
                                    filter(origin_region!="Oceania", missingAge == "Age missing") ,
                                                  aes(x = origin_region, 
                                                      y = total)) +
-  geom_bar(stat = "identity", colour = unhcrPaletteBlue[1], fill = unhcrPaletteWhite[1], alpha = 0)  +
+  geom_bar(stat = "identity", colour = unhcrPaletteBlue[1], fill = unhcrPaletteWhite[1], alpha = 0,
+           size = 1.6)  +
   ggtitle("Age data missing") +
-  theme_minimal()
+  labs(y = "Number of refugees")  +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 16),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16),
+        panel.grid.major.x = element_blank()) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_si("m")))
+  
 
-
-p.oriregion.missingAge1  + p.oriregion.missingAge2+ plot_layout(guides = "collect") & theme(legend.position = "bottom") & ylim(c(NA,11000000))
+p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2+ plot_layout(guides = "collect") & theme(legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=16))  &  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()), limits = c(NA,11000000)) 
 
 
 # by asylum region
