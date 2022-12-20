@@ -38,11 +38,26 @@ unhcrPaletteGreen <- c("#00AB92")
 
 # Calculate the proportions of children and girls/women
 dem_longMissing <- dem_longMissing %>%
-  mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
-                            male_0_4, male_5_11, male_12_17)),
-         adults = rowSums(select(., female_18_59, female_60,
-                            male_18_59, male_60)),
-         childrenProp = children/total,
+  # group_by(asylum_iso3) %>% # begin remove from here to next remove marker once change made in preparedata.R
+  #  mutate(distanceAsyMeanW = weighted.mean(distance, w=total, na.rm=T)
+  #       ) %>% 
+  # ungroup() %>% 
+  #  mutate(distance = case_when(
+  #          distance == 0 ~ distanceAsyMeanW,
+  #          !(distance == 0 ) ~ distance
+  #         )
+  #       ) %>% 
+  # mutate(gniRatio = gni_asylum/gni_origin,
+  #        logGniRatio = log(gniRatio),
+  #        logDistance = log(distance)
+  #       ) %>% 
+  #   mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
+  #                           male_0_4, male_5_11, male_12_17)),
+  #        adults = rowSums(select(., female_18_59, female_60,
+  #                           male_18_59, male_60))
+  #   ) %>%
+  # end remove
+  mutate(childrenProp = children/total,
          femaleProp = female/total,
          missingAge = case_when(
               missing == "none" ~ "Age not missing",
@@ -63,12 +78,12 @@ top_origin_iso3 <- dem_longMissing %>%
 dem_longMissing_plots <- dem_longMissing %>% 
   filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none", total >=50)
 
-
+## gni
 p.children.gni <- ggplot(data = dem_longMissing_plots,
        aes(x = gni_diff, y = childrenProp, colour = neighbor)) +
   geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
   scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
-  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3 
   scale_size(guide = "none") +
   scale_alpha(guide = "none")
 
@@ -82,12 +97,30 @@ p.female.gni <- ggplot(data = dem_longMissing_plots,
   scale_alpha(guide = "none")
 
 
+p.children.loggni <- ggplot(data = dem_longMissing_plots,
+       aes(x =logGniRatio, y = childrenProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3 
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+p.female.loggni <- ggplot(data = dem_longMissing_plots,
+       aes(x = logGniRatio, y = femaleProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+## distance
 
 p.children.dist <- ggplot(data = dem_longMissing_plots,
        aes(x = distance, y = childrenProp, colour = neighbor)) +
   geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
   scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
-  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  facet_wrap(~ origin_country, scales = "free_x") + # Group the data by origin_iso3
   scale_size(guide = "none") +
   scale_alpha(guide = "none")
 
@@ -96,10 +129,27 @@ p.female.dist <- ggplot(data = dem_longMissing_plots,
        aes(x = distance, y = femaleProp, colour = neighbor)) +
   geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
   scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
-  facet_wrap(~ origin_country) + # Group the data by origin_iso3
+  facet_wrap(~ origin_country, scales = "free_x") + # Group the data by origin_iso3
   scale_size(guide = "none") +
   scale_alpha(guide = "none")
 
+
+p.children.logdist <- ggplot(data = dem_longMissing_plots,
+       aes(x = logDistance, y = childrenProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country, scales = "free_x") + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+p.female.logdist <- ggplot(data = dem_longMissing_plots,
+       aes(x = logDistance, y = femaleProp, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country, scales = "free_x") + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
 
 
 ### plot missingness
@@ -152,7 +202,7 @@ p.oriregion.missingAge2 <- ggplot(data = t.oriregion.missingAge %>%
   scale_y_continuous(labels = label_number(scale_cut = cut_si("m")))
   
 
-p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2+ plot_layout(guides = "collect") & theme(legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=16))  &  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()), limits = c(NA,11000000)) 
+p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2+ plot_layout(guides = "collect") & theme(legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=16))  &  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()), limits = c(NA,11000000)) & theme(title = )
 
 
 # by asylum region

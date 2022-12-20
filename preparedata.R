@@ -343,8 +343,8 @@ dem <- dem %>%
         ) %>% 
   ungroup() %>% 
   mutate(distance = case_when(
-           is.na(distance) ~ distanceAsyMeanW,
-           !(is.na(distance)) ~ distance
+           is.na(distance) | distance == 0 ~ distanceAsyMeanW,
+           !(is.na(distance) | distance == 0 ) ~ distance
           ),
          gni_origin = case_when(
            is.na(gni_origin) ~ gni_originAsyMeanW,
@@ -400,7 +400,25 @@ dem_longMissing <- dem %>%
          neighbor:gni_asylum) %>% 
   mutate(across(c(origin_iso3:missing, origin_region:asylum_hcr_subregion), factor)) %>%
   mutate(neighbor = factor(neighbor, levels = c("Yes", "No"))) %>%
-  mutate(year = as.integer(year))
+  mutate(year = as.integer(year)) %>%
+  group_by(asylum_iso3) %>%
+  mutate(distanceAsyMeanW = weighted.mean(distance, w=total, na.rm=T)
+  ) %>% 
+  ungroup() %>% 
+  mutate(distance = case_when(
+    distance == 0 ~ distanceAsyMeanW,
+    !(distance == 0 ) ~ distance
+  )
+  ) %>% 
+  mutate(gniRatio = gni_asylum/gni_origin,
+         logGniRatio = log(gniRatio),
+         logDistance = log(distance)
+  ) %>%
+  mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
+                                   male_0_4, male_5_11, male_12_17)),
+         adults = rowSums(select(., female_18_59, female_60,
+                                 male_18_59, male_60))
+  )
   
 
 ##### VII. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
