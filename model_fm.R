@@ -21,11 +21,6 @@ load("data/dem_refvda_end2021.RData")
 
 ##### II. Define model formula #####
 
-# f.m.fm <- bf(formula =  female | trials(total) ~ (1|origin_iso3/asylum_region/asylum_iso3) + # varying intercept
-#                                         logGniRatio + logDistance + neighbor + # population level covariates
-#                                         (0+logGniRatio + logDistance + neighbor|origin_iso3), # varying slopes by origin
-#              center = T # intercept centered at mean of population level covariates
-#             )
 f.m.fm <- bf(formula =  female | trials(total) ~ (1|origin_iso3/asylum_iso3) + # varying intercept
                logGniRatio + logDistance + neighbor + # population level covariates
                (0+logGniRatio + logDistance + neighbor|origin_iso3), # varying slopes by origin
@@ -40,13 +35,7 @@ priors.m.fm.empty <- get_prior(f.m.fm,
           data = dem_longMissing %>% 
           filter(missing %in% c("none", "age")))
 
-# priors.m.fm <- c(
-#   prior(normal(0,10), class = Intercept),
-#   prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds of female. Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
-#   prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3"),
-#   prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region"), # more pooling on region and country of asylum
-#   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
-#   )
+
 priors.m.fm <- c(
   prior(normal(0,10), class = Intercept),
   prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds of female. Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
@@ -54,6 +43,8 @@ priors.m.fm <- c(
   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
 )
 
+
+##### IV. Fit and save model ##### 
 
 m.fm <- brm(formula = f.m.fm,
                     family = binomial(link = "logit"),
@@ -69,9 +60,12 @@ m.fm <- brm(formula = f.m.fm,
             )
 saveRDS(m.fm, file =  paste0("models/m.fm_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
 
+
+##### V. Model diagnostics ##### 
 plot(m.fm)
-p.mf.mcmcacf <- mcmc_acf(m.fm,pars = variables(m.fm)[c(1,2,3,4)])
+p.m.mf.mcmcacf <- mcmc_acf(m.fm,pars = variables(m.fm)[c(1,2,3,4)])
 m.fm.loo <- loo(m.fm)
 plot(m.fm.loo)
+
 
 ############################################ END ###########################################################
