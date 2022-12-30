@@ -60,40 +60,83 @@ wpp_male <- c(0.086824115,
               0.56594869, # 18-59, reference cat
               0.123873553)
 
+stanvars.age <- stanvar(wpp_female, name = "wpp_female") + stanvar(wpp_male, name = "wpp_male")
+
+
 priors.m.age <- c(
-  prior(normal(log(wpp_female[1]/wpp_female[4]),1), class = Intercept, dpar = "mufemale04"),
-  prior(normal(log(wpp_female[2]/wpp_female[4]),1), class = Intercept, dpar = "mufemale511"),
-  prior(normal(log(wpp_female[3]/wpp_female[4]),1), class = Intercept, dpar = "mufemale1217"),
-  prior(normal(log(wpp_female[5]/wpp_female[4]),1), class = Intercept, dpar = "mufemale60"),
-  prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds of female. Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
-  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3"),
-  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale04", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale511", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale1217", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale60", resp = "femaleAge"),
+  prior(normal(log(0.082948798/0.555118782),1), class = Intercept, dpar = "mufemale04", resp = "femaleAge"),
+  prior(normal(log(0.117108803/0.555118782),1), class = Intercept, dpar = "mufemale511", resp = "femaleAge"),
+  prior(normal(log(0.094642446/0.555118782),1), class = Intercept, dpar = "mufemale1217", resp = "femaleAge"),
+  prior(normal(log(0.15018117/0.555118782),1), class = Intercept, dpar = "mufemale60", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mufemale04", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mufemale511", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mufemale1217", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mufemale60", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale04", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale511", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale1217", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale60", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale04", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale511", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale1217", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale60", resp = "maleAge"),
+  prior(normal(log(0.086824115/0.56594869),1), class = Intercept, dpar = "mumale04", resp = "maleAge"),
+  prior(normal(log(0.123420862/0.56594869),1), class = Intercept, dpar = "mumale511", resp = "maleAge"),
+  prior(normal(log(0.09993278/0.56594869),1), class = Intercept, dpar = "mumale1217", resp = "maleAge"),
+  prior(normal(log(0.123873553/0.56594869),1), class = Intercept, dpar = "mumale60", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mumale04", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mumale511", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mumale1217", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3", dpar = "mumale60", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale04", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale511", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale1217", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale60", resp = "maleAge", lb =0)
 )
+
+
+# priors.m.age <- c(
+#   prior(normal(log(wpp_female[1]/wpp_female[4]),1), class = Intercept, dpar = "mufemale04"),
+#   prior(normal(log(wpp_female[2]/wpp_female[4]),1), class = Intercept, dpar = "mufemale511"),
+#   prior(normal(log(wpp_female[3]/wpp_female[4]),1), class = Intercept, dpar = "mufemale1217"),
+#   prior(normal(log(wpp_female[5]/wpp_female[4]),1), class = Intercept, dpar = "mufemale60"),
+#   prior(normal(log(wpp_male[1]/wpp_male[4]),1), class = Intercept, dpar = "mumale04"),
+#   prior(normal(log(wpp_male[2]/wpp_male[4]),1), class = Intercept, dpar = "mumale511"),
+#   prior(normal(log(wpp_male[3]/wpp_male[4]),1), class = Intercept, dpar = "mumale1217"),
+#   prior(normal(log(wpp_male[5]/wpp_male[4]),1), class = Intercept, dpar = "mumale60"),
+#   prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
+#   prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3"),
+#   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
+# )
 
 
 ##### IV. Fit and save model ##### 
 
-m.fm <- brm(formula = f.m.fm,
-                    family = binomial(link = "logit"),
-            data = dem_longMissing %>% filter(missing %in% c("none", "age")),
-            prior = priors.m.fm,
+m.age <- brm(formula = f.m.age,
+            data = dem_longMissing %>% filter(missing %in% c("none")),
+            prior = priors.m.age,
+         #   stanvars = stanvars.age,
             init = 0,
             sample_prior = "yes",
             iter = 3000,
             cores = 4,
             control=list(adapt_delta=0.9, 
                           max_treedepth=12),
-            seed = 938
+            seed = 2050
             )
-saveRDS(m.fm, file =  paste0("models/m.fm_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
+saveRDS(m.age, file =  paste0("models/m.age_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
 
 
 ##### V. Model diagnostics ##### 
 
-plot(m.fm)
-p.m.mf.mcmcacf <- mcmc_acf(m.fm,pars = variables(m.fm)[c(1,2,3,4)])
-m.fm.loo <- loo(m.fm)
-plot(m.fm.loo)
+plot(m.age)
+p.m.age.mcmcacf <- mcmc_acf(m.age,pars = variables(m.age)[c(1:8)]) # acf of intercept mcmcs
+m.age.loo <- loo(m.age)
+plot(m.age.loo)
 
 
 ############################################ END ###########################################################
