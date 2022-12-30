@@ -1,10 +1,10 @@
 ############################################ START ###########################################################
 
-############################################ model_fm.R ################################################
+############################################ model_age.R ################################################
 
 #### Queries: UNHCR Statistics and Demographics Section, UNICEF
 #### Project: Demographic models end-2021
-#### Description: Binomial model for female/male counts
+#### Description: Multinomial models for sex-specific age counts
 
 ##### I. Read data, packages etc ##### 
 
@@ -97,21 +97,6 @@ priors.m.age <- c(
   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale1217", resp = "maleAge", lb =0),
   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale60", resp = "maleAge", lb =0)
 )
-
-
-# priors.m.age <- c(
-#   prior(normal(log(wpp_female[1]/wpp_female[4]),1), class = Intercept, dpar = "mufemale04"),
-#   prior(normal(log(wpp_female[2]/wpp_female[4]),1), class = Intercept, dpar = "mufemale511"),
-#   prior(normal(log(wpp_female[3]/wpp_female[4]),1), class = Intercept, dpar = "mufemale1217"),
-#   prior(normal(log(wpp_female[5]/wpp_female[4]),1), class = Intercept, dpar = "mufemale60"),
-#   prior(normal(log(wpp_male[1]/wpp_male[4]),1), class = Intercept, dpar = "mumale04"),
-#   prior(normal(log(wpp_male[2]/wpp_male[4]),1), class = Intercept, dpar = "mumale511"),
-#   prior(normal(log(wpp_male[3]/wpp_male[4]),1), class = Intercept, dpar = "mumale1217"),
-#   prior(normal(log(wpp_male[5]/wpp_male[4]),1), class = Intercept, dpar = "mumale60"),
-#   prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
-#   prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3"),
-#   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
-# )
 
 
 ##### IV. Fit and save model ##### 
