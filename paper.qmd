@@ -20,6 +20,7 @@ library(gt)
 library(ggplot2)
 library(patchwork)
 library(scales)
+library(ggdist)
 
 ### read datasets
 load("data/dem_refvda_end2021.RData")
@@ -338,5 +339,124 @@ Summary of modelling workflow:
 5.  Using the multiple imputations of the age-missing dataset from step 3 as new data, draw one realisation for each of the m datasets from the posterior predictive distributions of M_female and M_male to obtain 200 age/sex imputed final datasets.
 
 ## Results
+
+```{r}
+##### check predictions ##### 
+
+imputations <- imputations %>% 
+  ungroup() %>%
+  mutate(femaleProp = female/total,
+         children = rowSums(select(., female_0_4, female_5_11, female_12_17, male_0_4, male_5_11, male_12_17))) %>% 
+  mutate(childrenProp = children/total)
+
+
+### by country of origin
+
+## identify 3 large populations with missing age/sex data
+t.dem.ageMissingTop9 <- dem_longMissing %>%
+  ungroup() %>%
+  filter(missing == "sexAge")%>%
+  slice_max(total, n=9)
+  
+t.dem.ageMissingPlots <- dem_longMissing  %>% 
+  filter(origin_iso3 == "VEN" & asylum_iso3 == "PER" & popType=="VDA" | origin_iso3 == "VNM" & asylum_iso3 == "CHN" |  origin_iso3 == "SYR" & asylum_iso3 == "SWE")
+
+t.imp.ageMissingPlots <- imputations %>% 
+  filter(origin_iso3 == "VEN" & asylum_iso3 == "PER" & popType=="VDA" | origin_iso3 == "VNM" & asylum_iso3 == "CHN" |  origin_iso3 == "SYR" & asylum_iso3 == "SWE")
+
+# show for ifms
+imputations.slides <- imputations %>% filter(imputation %in% c(1,2,3) & (origin_iso3 == "VEN" & asylum_iso3=="BOL" &popType == "VDA" | origin_iso3 == "SOM" & asylum_iso3=="UGA" | origin_iso3=="IDN" & asylum_iso3 == "PNG")) %>% arrange(origin_iso3, imputation) %>% select(imputation, origin_country, asylum_country, female_0_4:total)
+
+#write.csv(imputations.slides, "ifms/imputations.slides.csv")
+
+## Syria
+# plot of uncertainty (full posterior distribution) 
+# y: histogram
+# x: proportion of female over imputations
+# group: country of asylum
+
+imputations.syr <- imputations %>% 
+  filter(origin_iso3 == "SYR") 
+
+dem.syr.select <- dem_longMissing %>% filter(origin_iso3=="SYR", asylum_iso3 %in% c("SWE", "USA",  "MCO",  "LBN", "JOR", "GBR"))
+
+p.imputations.syr.female <- ggplot(data = imputations.syr  ,
+                            aes(y=reorder(asylum_country, femaleProp))) +
+                    stat_histinterval(aes(x = femaleProp), slab_type  = "histogram")
+
+p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",  "MCO",  "LBN", "JOR", "GBR")),
+      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
+     stat_halfeye() 
+
+p.imputations.syr.reg.children <- ggplot(data = imputations.syr,
+      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
+     stat_gradientinterval() +
+  facet_wrap(~ asylum_region, scales = "free")
+
+p.imputations.syr.neighbour.children <- ggplot(data = imputations.syr,
+      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
+     stat_gradientinterval() +
+  facet_wrap(~ neighbor, scales = "free")
+
+
+### by region of asylum
+t.dem.asyreg.children <- dem_longMissing %>% 
+  filter(!is.na(children)) %>%
+  group_by(asylum_region) %>% 
+  summarise(children = sum(children), total = sum(total)) %>% 
+  mutate(childrenProp = children/total)
+
+t.dem.asyreg.female <- dem_longMissing %>% 
+  filter(!is.na(female)) %>%
+  group_by(asylum_region) %>% 
+  summarise(female = sum(female), total = sum(total)) %>% 
+  mutate(femaleProp = female/total)
+
+imputations.asyreg <- imputations %>% 
+  group_by(imputation, asylum_region) %>% 
+  summarise(children = sum(children), female = sum(female), total = sum(total)) %>% 
+  ungroup() %>%
+  mutate(childrenProp = children/total,
+         femaleProp = female/total) %>% 
+  ungroup()
+
+t.imp.asyreg.children <- imputations.asyreg %>% 
+  group_by(asylum_region) %>% 
+  summarise(childrenMeanProp = mean(childrenProp), 
+            lowerUI = quantile(childrenProp, probs = 0.025), 
+            upperUI = quantile(childrenProp, probs = 0.975)
+            ) %>% 
+  left_join(t.dem.asyreg.children %>% select(asylum_region, childrenProp), by = "asylum_region", suffix = c(".imputed", ".availableData"))
+
+t.imp.asyreg.female <- imputations.asyreg %>% 
+  group_by(asylum_region) %>% 
+  summarise(femaleProp = mean(femaleProp), lowerUI = quantile(femaleProp, probs = 0.025), upperUI = quantile(femaleProp, probs = 0.975)) %>% 
+  left_join(t.dem.asyreg.female %>% select(asylum_region, femaleProp), by = "asylum_region", suffix = c(".imputed", ".availableData"))
+
+
+### world
+t.dem.children <- dem_longMissing %>% 
+  filter(!is.na(children)) %>%
+  summarise(children = sum(children), total = sum(total)) %>% 
+  mutate(childrenProp = children/total)
+
+t.dem.female <- dem_longMissing %>% 
+  filter(!is.na(female)) %>%
+  summarise(female = sum(female), total = sum(total)) %>% 
+  mutate(femaleProp = female/total)
+
+t.imp.children <- imputations %>% 
+  group_by(imputation) %>% 
+  summarise(children = sum(children), female = sum(female), total = sum(total)) %>% 
+  mutate(childrenProp = children/total,
+         femaleProp = female/total) %>% 
+  ungroup() %>%
+summarise(childrenMeanProp = mean(childrenProp), 
+              lowerUI = quantile(childrenProp, probs = 0.025), 
+              upperUI = quantile(childrenProp, probs = 0.975)
+    )
+  
+
+```
 
 ## Application example
