@@ -20,8 +20,8 @@ library(tictoc)
 load("data/dem_refvda_end2021.RData")
 
 ### read brms fit objects
-m.fm <- readRDS("models/m.fm.rds")
-m.age <- readRDS("models/m.age.rds")
+m.fm <- readRDS("models/m.fm2_20230106.rds")
+m.age <- readRDS("models/m.age2_20230108.rds")
 
 
 ##### II. Draw from posterior predictive distributions of m.fm and m.age ##### 
@@ -32,7 +32,7 @@ m.fm.pred <- dem_longMissing %>%
   add_predicted_draws(m.fm,
                       allow_new_levels = T,
                       sample_new_levels = "uncertainty",
-                      ndraws = 4000,
+                      ndraws = 200,
                       seed = 2016)
 
 
@@ -42,6 +42,8 @@ m.fm.pred <- m.fm.pred %>%
   mutate(male = total-female) %>%
   rename(.mfdraw = .draw) %>%
   select(-c(.chain, .iteration, .prediction))
+
+
 
 
 # add same type ii) dataset for each imputation
@@ -210,7 +212,7 @@ table(imputations$origin_region, useNA = "ifany")
 
 ##### IV. Write files ##### 
 
-saveRDS(imputations, file =  paste0("output/imputations", length(unique(imputations$imputation)), "_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
+saveRDS(imputations, file =  paste0("output/imputations2", length(unique(imputations$imputation)), "_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
 
 
 ############################################ END ###########################################################

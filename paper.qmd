@@ -386,7 +386,8 @@ p.imputations.syr.female <- ggplot(data = imputations.syr  ,
 
 p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",  "MCO",  "LBN", "JOR", "GBR")),
       aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
-     stat_halfeye() 
+     stat_halfeye() +
+  theme_minimal()
 
 p.imputations.syr.reg.children <- ggplot(data = imputations.syr,
       aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +

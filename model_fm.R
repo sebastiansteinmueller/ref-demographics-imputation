@@ -38,7 +38,7 @@ priors.m.fm.empty <- get_prior(f.m.fm,
 
 
 priors.m.fm <- c(
-  prior(normal(0,10), class = Intercept),
+  prior(normal(0,1), class = Intercept),
   prior(student_t(7,0,2.5), class = b), # population-level parameters have a multiplicative effect on odds of female. Absolute values above ~3 (ten-fold reduction/increase in odds for doubling in distance/gni ratio) are implausible, thus choice of narrower prior with df=7
   prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_iso3"),
   prior(student_t(5,0,2.5), class = sd, group = "origin_iso3") # less pooling, i.e. closer to separate model for each origin
@@ -64,10 +64,10 @@ saveRDS(m.fm, file =  paste0("models/m.fm_", str_remove_all(as.character(Sys.Dat
 
 ##### V. Model diagnostics ##### 
 
-plot(m.fm)
-p.m.mf.mcmcacf <- mcmc_acf(m.fm,pars = variables(m.fm)[c(1,2,3,4)])
-m.fm.loo <- loo(m.fm)
-plot(m.fm.loo)
+# plot(m.fm)
+# p.m.mf.mcmcacf <- mcmc_acf(m.fm,pars = variables(m.fm)[c(1,2,3,4)])
+# m.fm.loo <- loo(m.fm)
+# plot(m.fm.loo)
 
 
 ############################################ END ###########################################################
