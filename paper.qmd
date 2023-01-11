@@ -21,10 +21,17 @@ library(ggplot2)
 library(patchwork)
 library(scales)
 library(ggdist)
+library(tidybayes)
+library(brms)
+library(equatiomatic)
 
 ### read datasets
 load("data/dem_refvda_end2021.RData")
-imputations <- readRDS("output/imputations200.rds")
+imputations <- readRDS("output/imputations2_20230110_1.rds")
+
+### read brms fit objects
+m.fm <- readRDS("models/m.fm2_20230106.rds")
+m.age <- readRDS("models/m.age2_20230108.rds")
 
 ## colours (https://intranet.unhcr.org/content/dam/unhcr/intranet/staff%20support/strategic/documents/english/brand-book/UNHCR-Brand%20Book.pdf)
 unhcrPaletteBlue <- c("#0072BC", "#338EC9", "#66AAD7", "#99C7E4", "#CCE3F2")
@@ -36,11 +43,11 @@ unhcrPaletteGreen <- c("#00AB92")
 
 ```
 
-UNHCR compiles official statistics on stocks and flows of forcibly displaced and stateless persons twice a year, once for mid-year figures (Mid-Year Statistical Reporting, MYSR) and once for end-year figures (Annual Statistical Reporting, ASR). For these reporting exercises, country operations compile aggregate population figures from a range of sources and data producers such as governments, UNHCR's own refugee registration database proGres and sometimes non-governmental actors. The figures undergo a statistical quality control process at the country, regional and global level of the organisation and are disseminated on the publicly available refugee data finder (https://www.unhcr.org/refugee-statistics/) after applying statistical disclosure control to suppress very small counts of persons that could identify individuals.
+UNHCR compiles official statistics on stocks and flows of forcibly displaced and stateless persons twice a year, once for mid-year figures (Mid-Year Statistical Reporting, MYSR) and once for end-year figures (Annual Statistical Reporting, ASR). For these reporting exercises, UNHCR's country offices compile aggregate population figures for refugees and asylum-seekers hosted in their country from a range of sources and data producers such as governments, UNHCR's own refugee registration database proGres and sometimes non-governmental actors. The geographic level on which theses statistics are being produced is therefore always the country country of asylum. The figures undergo a statistical quality control process at the country, regional and global level of the organisation and are disseminated on the publicly available refugee data finder (https://www.unhcr.org/refugee-statistics/) after applying statistical disclosure control to suppress very small counts of persons that could identify individuals. The models and results presented in this paper use data only on the end-year stock of refugees under UNHCR's mandate (including Venezuelans displaced abroad, excluding Palestine refugees under UNRWA's mandate), that is, not on asylum-seekers, internally displaced persons and stateless persons. 
 
-The end-year figures compiled with reporting date 31 December contain sex- and age breakdowns of the stocks of displaced and stateless people under UNHCR's mandate. @tbl-data displays the sex- and age-disaggregated data on the stock of refugees under UNHCR's mandate (including Venezuelans displaced abroad, excluding Palestine refugees under UNRWA's mandate). The data is available by country of origin and country of asylum. The variables \[sex\]\_\[agebracket\] contain the counts of refugees as of 31 December 2020 in the individual sex and age brackets in the respective geographic/stateless combination. For example, *female_12_17* contains the number of female refugees aged 12 to 17. Variable *total* is the total number of refugees over all sex/age categories.
+The end-year figures compiled with reporting date 31 December contain sex- and age breakdowns of the stocks refugees under UNHCR's mandate. The data is available by country of origin and country of asylum. The variables \[sex\]\_\[agebracket\] contain the counts of refugees as of 31 December 2021 in the individual sex and age brackets in the respective geographic/stateless combination. For example, *female_12_17* contains the number of female refugees aged 12 to 17. Variable *total* is the total number of refugees over all sex/age categories.
 
-Pre-defined sex-specific age brackets are 0-4, 5-11, 12-17, 18-59 and 60 years and older. For some origin/asylum combinations, only sex-disaggregated data without age information is available, and finally there are population groups for which only the total end-year count without any demographic information is available. These different levels of disaggregated data availability is recorded in variable *missing* in the dataset: "none" for populations for whom age- and sex disaggregation is available, "age" where only counts of female and male refugees are available without age information and "sexAge" for populations without any available demographic information.
+Pre-defined sex-specific age brackets are 0-4, 5-11, 12-17, 18-59 and 60 years and older. For some origin/asylum combinations, only sex-disaggregated data without age information is available, and finally there are population groups for which only the total end-year count without any demographic information is available. These different levels of disaggregated data availability is recorded in variable *missing* in the dataset: "none" for populations for whom age- and sex disaggregation is available, "age" where only counts of female and male refugees are available without age information and "sexAge" for populations without any available demographic information. @tbl-data displays six rows of this dataset for illustration (age brackets other than 18-59 not shown for better readability).
 
 ```{r, message=FALSE, warning=FALSE}
 #| label: tbl-data
@@ -59,6 +66,53 @@ dem_longMissing %>%
   gt() %>% 
   tab_options(table.font.size = "40%")
 ```
+
+```{r, message=FALSE, warning=FALSE}
+t.missing.asyregion <- dem_longMissing %>% 
+  group_by(asylum_region, missingAge) %>% 
+  summarise(total = sum(total),
+            nOrigin = n_distinct(origin_country)) %>% 
+  mutate(freq.totalEndYear = total/sum(total),
+         freq.origin = nOrigin / sum(nOrigin)) %>%
+  ungroup()
+
+```
+
+Since reporting of official figures is undertaken at the level of the country of asylum, the reasons for missingness of age- and sex-disaggregated data in UNHCR's official statistics are located in the country - be it UNHCR's or government offices - in which refugees are hosted. This might in many countries be a lack of priority or technical capacity to produce such disaggregated figures, or in some instances unwillingness to share detailed data. 
+
+@fig-missingAsy shows for what proportion of the refugee population living in each region age-disaggregated data was available at the end of 2021. While demographic coverage is close to universal for refugees hosted in Africa, it is available for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Europe", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent of refugees in Europe, `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Asia", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in Asia and only for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Americas", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in the Americas. This is to a large extent a result of the differing population data sources in these regions: While the individual demographic details of refugees in many countries in Africa and MENA are recorded in UNHCR’s own case registration system proGres, population data in other regions often comes from government offices with varying degrees of availability of demographic data.
+
+```{r, message=FALSE, warning=FALSE, out.width="80%", out.height="160%"}
+#| label: fig-missingAsy
+#| fig-cap: Missingness by region of asylum
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+
+
+
+p.asyregion.missing <- ggplot(data = t.missing.asyregion %>% 
+                                                   filter(!is.na(asylum_region)),
+                                                 aes(x = `missingAge`, 
+                                                     y = freq.totalEndYear*100,
+                                                     fill = `missingAge`)) +
+  geom_bar( stat="identity") +
+  scale_fill_manual(values=c(unhcrPaletteBlack[1], unhcrPaletteBlue[4])) +
+  facet_wrap(~  `asylum_region`, ncol = 1, scales = "fixed") +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 13),
+    #    plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 13)) +
+     #   panel.grid.major.x = element_blank()) +
+    theme(legend.title = element_blank(), legend.position = "bottom") +
+    coord_flip() 
+
+p.asyregion.missing
+```
+
 
 ```{r}
 ##### II. Plot hierarchies and covariates ##### 
@@ -95,15 +149,38 @@ dem_longMissing <- dem_longMissing %>%
 ### plot covariates against proportions of children and female
 
 # Get the 9 largest origin_iso3 by total
-top_origin_iso3 <- dem_longMissing %>%
+top9_origin_iso3 <- dem_longMissing %>%
   group_by(origin_iso3) %>%
   summarize(total = sum(total)) %>%
   arrange(desc(total)) %>%
   top_n(9)
 
 
+top4_origin_iso3 <- top9_origin_iso3 %>%
+  top_n(4)
+
+
+### origin / asylum plots ### 
+
+## children
+dem_longMissing_geoplots <- dem_longMissing %>% 
+  filter(origin_iso3 %in% top4_origin_iso3$origin_iso3, missing == "none", total >=500)
+
+
+p.top4.children.ori.asy <-  ggplot(data = dem_longMissing_geoplots,
+       aes(x = origin_country, y = childrenProp, colour = asylum_region)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteGreen[1], unhcrPaletteRed[1], unhcrPaletteBlack[1])) +
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none")
+
+
+
+### covariate plots ### 
+
 dem_longMissing_plots <- dem_longMissing %>% 
-  filter(origin_iso3 %in% top_origin_iso3$origin_iso3, missing == "none", total >=50)
+  filter(origin_iso3 %in% top9_origin_iso3$origin_iso3, missing == "none", total >=50)
+
 
 ## gni
 p.children.gni <- ggplot(data = dem_longMissing_plots,
@@ -270,25 +347,17 @@ t.missing <- dem_longMissing %>%
 
 
 
-## create type i, ii and iii datasets
-
-type1 <- dem_longMissing %>% 
-  filter(missing %in% c("none"))
-
-type2 <- dem_longMissing %>% 
-  filter(missing %in% c("age"))
-
-type3 <- dem_longMissing %>% 
-  filter(missing %in% c("sexAge"))
-
-
 ```
 
 ## Data gaps and need for modelling
-UNHCR has in the past typically reported the sex/age breakdown in the available data as global and regional aggregates of the demographic distribution of all refugees. By reporting the observed demographic distribution as the sex/age structure of the entire refugee population including the part without available data, we are assuming that the `r t.missing[t.missing$"Type of missingness"=="iii) Age and sex missing",]$"% of refugees"` per cent for whom no age information was available at the end of 2021 have the same age distribution as the ones with available data. It is difficult to check this very strong assumption of ignorability of the missing data without further information on the sex/age distribution in the missing part of the data. We can however compare the distribution of other, fully available variables between refugees with and without demographic information. If such variables can be assumed to be correlated with the sex/age distribution at least to some extent, this can give us an indication whether the ignorability assumption is likely to be justified or not.   
-In particular, we can look at the distribution of data availability by country and region of asylum, and we can furthermore compare the distribution of origins of refugees in the observed and the unobserved part of the population. If missingness of demographic data was entirely random and thus ignorable, we would expect the geographic origins of refugees to be similar in the observed and the unobserved part of the demographic data, that is, we would see a similar distribution of origin countries.  
+
+UNHCR has in the past typically reported the sex/age breakdown in the available data as global and regional aggregates of the demographic distribution of all refugees. By reporting the observed demographic distribution as the sex/age structure of the entire refugee population including the part without available data, we are assuming that the `r t.missing[t.missing$"Type of missingness"=="iii) Age and sex missing",]$"% of refugees"` per cent for whom no age information was available at the end of 2021 have the same age distribution as the ones with available data. It is difficult to check this very strong assumption of ignorability of the missing data without further information on the sex/age distribution in the missing part of the data. We can however compare the distribution of other, fully available variables between refugees with and without demographic information. If such variables can be assumed to be correlated with the sex/age distribution at least to some extent, this can give us an indication whether the ignorability assumption is likely to be justified or not.
+
+\
+In particular, we can look at the distribution of data availability by country and region of asylum, and we can furthermore compare the distribution of origins of refugees in the observed and the unobserved part of the population. If missingness of demographic data was entirely random and thus ignorable, we would expect the geographic origins of refugees to be similar in the observed and the unobserved part of the demographic data, that is, we would see a similar distribution of origin countries.
+
 ```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="120%"}
-#| label: fig-missing
+#| label: fig-missingOri
 #| fig-cap: Missingness by origin region
 #| warning: false
 #| error: false
@@ -296,47 +365,24 @@ In particular, we can look at the distribution of data availability by country a
 #| message: false
 p.oriregion.missingAge
 ```
-Figure @fig-missing shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population with (left side) and without (right side) age-disaggregated data. The most common origin regions are Sub-Saharan Africa and the MENA region for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and the Asia-Pacific region. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data are fundamentally different from those without such data, and that we cannot simply assume the same demographic distribution between these two groups. 
+
+@fig-missingOri shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population with (left side) and without (right side) age-disaggregated data. The most common origin regions are Sub-Saharan Africa and the MENA region for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and the Asia-Pacific region. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data are fundamentally different from those without such data, and that we cannot simply assume the same demographic distribution between these two groups.
 
 
-## Models
-
-Missingness in the country-pair dataset can be summarised as follows, also shown in @tbl-missing:
-
-i.  Neither age nor sex counts missing, i.e. complete observations
-
-ii. Age counts missing, female and male counts available
-
-iii. Both age and sex counts missing
-
-
-```{r, message=FALSE, warning=FALSE}
-#| label: tbl-missing
-#| tbl-cap: Proportion of missingness
+```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="120%"}
+#| label: fig-childrenOriAsy
+#| fig-cap: Proportion of children per country of asylum by country of origin
 #| warning: false
 #| error: false
 #| echo: false
 #| message: false
-t.missing %>%
-  gt() %>% 
-  tab_options(table.font.size = "30%")
+ p.top4.children.ori.asy
 ```
 
-Estimating combined age-/sex counts with type i) data and drawing from the posterior predictive distribution to impute age-/sex counts for type ii) and iii) country pairs is straightforward in a single multinomial model with 10 categories, i.e. two sex- times five age-categories. However, this approach ignores the available female and male counts in type ii) data and thereby discards information. It is preferable to use all available data and restrict predicted sex-specific age counts of type ii) data so they sum up to the actually observed female and male counts.
 
-This means we need to fit two multinomial models (M_male and M_female) to predict sex-specific age counts for type ii) and iii) data, one for female and one for male refugees per country pair. Furthermore, it requires prediction of female and male counts for type iii) data in a first model M0. It would theoretically be possible to use point parameter estimates from this model M0 to calculate expected single values of the number of female and male refugees for the second step, predicting sex-specific age counts with the multinomial models M_male and M_female. While easy to implement, we would be ignoring uncertainty from predicting female and male counts in type iii) data. Instead, we will combine multiple imputations of the dataset with predicted female and male counts from M0 as input data for M_male and M_female to account for predictive and model uncertainty from M0.
+## Models
 
-Summary of modelling workflow:
-
-1.  Using type i) and ii) data, estimate the proportion of female and male refugees per country pair in a binomial model M0.
-
-2.  Draw m imputations from the posterior predictive distribution of M0 to predict female and male counts in type iii) data.
-
-3.  Combine type ii) data with observed female/male counts and the 200 multiple imputations for type iii) data from step 2 to obtain m datasets to be used as new data in predictions.
-
-4.  Using type i) data, fit two multinomial models M_female and M_male to estimate sex-specific age distribution.
-
-5.  Using the multiple imputations of the age-missing dataset from step 3 as new data, draw one realisation for each of the m datasets from the posterior predictive distributions of M_female and M_male to obtain 200 age/sex imputed final datasets.
+$$        $$
 
 ## Results
 
@@ -378,13 +424,21 @@ imputations.slides <- imputations %>% filter(imputation %in% c(1,2,3) & (origin_
 imputations.syr <- imputations %>% 
   filter(origin_iso3 == "SYR") 
 
-dem.syr.select <- dem_longMissing %>% filter(origin_iso3=="SYR", asylum_iso3 %in% c("SWE", "USA",  "MCO",  "LBN", "JOR", "GBR"))
+dem.syr.select <- dem_longMissing %>% filter(origin_iso3=="SYR", asylum_iso3 %in% c("SWE", "USA",  "LBN", "JOR", "GBR"))
 
-p.imputations.syr.female <- ggplot(data = imputations.syr  ,
-                            aes(y=reorder(asylum_country, femaleProp))) +
-                    stat_histinterval(aes(x = femaleProp), slab_type  = "histogram")
+p.imputations.syr.female  <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",    "LBN", "JOR", "GBR")),
+      aes(y=reorder(asylum_country, femaleProp), x=femaleProp)) +
+     stat_halfeye() +
+  theme_minimal()
 
-p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",  "MCO",  "LBN", "JOR", "GBR")),
+
+p.imputations.syr.reg.female <- ggplot(data = imputations.syr,
+      aes(y=reorder(asylum_country, femaleProp), x=femaleProp)) +
+     stat_gradientinterval() +
+  facet_wrap(~ asylum_region, scales = "fixed")
+
+
+p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",    "LBN", "JOR", "GBR")),
       aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
      stat_halfeye() +
   theme_minimal()
@@ -456,7 +510,17 @@ summarise(childrenMeanProp = mean(childrenProp),
               lowerUI = quantile(childrenProp, probs = 0.025), 
               upperUI = quantile(childrenProp, probs = 0.975)
     )
-  
+
+t.imp.female <- imputations %>% 
+  group_by(imputation) %>% 
+  summarise(children = sum(children), female = sum(female), total = sum(total)) %>% 
+  mutate(childrenProp = children/total,
+         femaleProp = female/total) %>% 
+  ungroup() %>%
+summarise(femaleMeanProp = mean(femaleProp), 
+              lowerUI = quantile(femaleProp, probs = 0.025), 
+              upperUI = quantile(femaleProp, probs = 0.975)
+    )
 
 ```
 
