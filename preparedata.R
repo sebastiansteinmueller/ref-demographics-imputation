@@ -420,6 +420,23 @@ dem_longMissing <- dem %>%
                                  male_18_59, male_60))
   )
   
+dem_longMissing <- dem_longMissing %>% 
+  mutate(asylum_sdgregion = case_when(
+    asylum_subregion %in% c("Australia and New Zealand") ~ "Australia and New Zealand",
+    asylum_subregion %in% c("Central Asia", "Southern Asia") ~ "Central and Southern Asia",
+    asylum_subregion %in% c("Eastern Asia") ~ "Eastern Asia",
+    asylum_subregion %in% c("South-eastern Asia") ~ "South-eastern Asia",
+    asylum_subregion %in% c("Eastern Europe", "Southern Europe") ~ "Eastern and Southern Europe",
+    asylum_subregion %in% c("Latin America and the Caribbean") ~ "Latin America and the Caribbean",
+    asylum_subregion %in% c("Melanesia", "Micronesia", "Polynesia") ~ "Oceania",
+    asylum_subregion %in% c("Northern Africa", "Western Asia") ~ "Northern Africa and Western Asia",
+    asylum_subregion %in% c("Northern America") ~ "Northern America",
+    asylum_subregion %in% c("Northern Europe", "Western Europe") ~ "Northern and Western Europe",
+    asylum_subregion %in% c("Sub-Saharan Africa") ~ "Sub-Saharan Africa"
+    )
+  )
+
+
 
 ##### VII. Final checks: internal consistency of dataset, totals and proportion of missingness ##### 
 
