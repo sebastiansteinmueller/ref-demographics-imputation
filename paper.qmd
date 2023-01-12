@@ -8,7 +8,6 @@ execute:
   message: false
 ---
 
-## Dataset
 
 ```{r}
 #| include: false
@@ -43,42 +42,50 @@ unhcrPaletteWhite <- c("#FFFFFF")
 unhcrPaletteRed <- c("#E73451")
 unhcrPaletteGreen <- c("#00AB92")
 
-```
 
-
-
-
-```{r}
 ##### II. Plot hierarchies and covariates ##### 
 
 # Calculate the proportions of children and girls/women
 dem_longMissing <- dem_longMissing %>%
-  # group_by(asylum_iso3) %>% # begin remove from here to next remove marker once change made in preparedata.R
-  #  mutate(distanceAsyMeanW = weighted.mean(distance, w=total, na.rm=T)
-  #       ) %>% 
-  # ungroup() %>% 
-  #  mutate(distance = case_when(
-  #          distance == 0 ~ distanceAsyMeanW,
-  #          !(distance == 0 ) ~ distance
-  #         )
-  #       ) %>% 
-  # mutate(gniRatio = gni_asylum/gni_origin,
-  #        logGniRatio = log(gniRatio),
-  #        logDistance = log(distance)
-  #       ) %>% 
-  #   mutate(children = rowSums(select(., female_0_4, female_5_11, female_12_17,
-  #                           male_0_4, male_5_11, male_12_17)),
-  #        adults = rowSums(select(., female_18_59, female_60,
-  #                           male_18_59, male_60))
-  #   ) %>%
-  # end remove
   mutate(childrenProp = children/total,
          femaleProp = female/total,
          missingAge = case_when(
               missing == "none" ~ "Age not missing",
               missing != "none" ~ "Age missing" 
-            )
-         )
+            ),
+         origin_countryShort = case_when(
+              origin_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
+              origin_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
+              origin_country == "Bolivia (Plurinational State of)" ~ "UK",
+              origin_country == "Central African Republic" ~ "CAR",
+              origin_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
+              origin_country == "Lao People's Democratic Republic" ~ "Lao",
+              origin_country == "Russian Federation" ~ "Russia",
+              origin_country == "Syrian Arab Republic" ~ "Syria",
+              origin_country == "Democratic Republic of the Congo" ~ "DRC",
+              origin_country == "United Republic of Tanzania" ~ "Tanzania",
+              origin_country == "United States of America" ~ "USA",
+              origin_country == "United Arab Emirates" ~ "UAE",
+              TRUE ~ as.character(origin_country)
+          ),
+         asylum_countryShort = case_when(
+              asylum_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
+              asylum_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
+              asylum_country == "Bolivia (Plurinational State of)" ~ "UK",
+              asylum_country == "Central African Republic" ~ "CAR",
+              asylum_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
+              asylum_country == "Lao People's Democratic Republic" ~ "Lao",
+              asylum_country == "Russian Federation" ~ "Russia",
+              asylum_country == "Syrian Arab Republic" ~ "Syria",
+              asylum_country == "Democratic Republic of the Congo" ~ "DRC",
+              asylum_country == "United Republic of Tanzania" ~ "Tanzania",
+              asylum_country == "United States of America" ~ "USA",
+              asylum_country == "United Arab Emirates" ~ "UAE",
+              TRUE ~ as.character(asylum_country)  
+          )
+         ) %>% 
+  mutate(origin_countryShort = factor(origin_countryShort), 
+         asylum_countryShort = factor(asylum_countryShort))
 
 ### plot covariates against proportions of children and female
 
@@ -99,32 +106,6 @@ top4_origin_iso3 <- top9_origin_iso3 %>%
 ## children
 dem_longMissing_geoplots <- dem_longMissing %>% 
   filter(origin_iso3 %in% top4_origin_iso3$origin_iso3, missing == "none", total >=500)
-
-
-
-p.top4.children.ori.asy <-  ggplot(data = dem_longMissing_geoplots,
-       aes(x = origin_country, y = childrenProp*100, colour = asylum_region)) +
-  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
-  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteGreen[1], unhcrPaletteRed[1], unhcrPaletteBlack[1])) +
-  scale_size(guide = "none") +
-  scale_alpha(guide = "none") +
-  labs(x = "Origin country\n(Dots proportional to population size of country of asylum)", y="Percentage of children in country of asylum") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(size = 11, angle = 0),
-        axis.text.y = element_text(size = 13),
-        axis.title.x = element_text(size = 13),
-        axis.title.y = element_text(size = 13),
-        panel.grid.major.x = element_blank()) +
-    theme(legend.title = element_blank(), legend.position = "bottom") +
-    annotate("text", x = 3.6, y = 52, label = "Syrian refugees\nin Türkiye", size = 3.5) +
-  geom_curve(
-    data =   tibble(
-    x1 = c(3.6),
-    x2 = c(3.1),
-    y1 = c(50), 
-    y2 = c(45.3)), aes(x = x1, y = y1, xend = x2, yend = y2),
-    arrow = arrow(length = unit(0.08, "inch")), size = 0.8,
-    color = "gray20", curvature = -0.3)
 
 
 
@@ -219,47 +200,6 @@ t.oriregion.missingAge <- dem_longMissing %>%
             adults = sum(adults))
 
 
-p.oriregion.missingAge1 <- ggplot(data = t.oriregion.missingAge %>%
-                                   filter(origin_region!="Oceania", missingAge == "Age not missing") %>% 
-                                    pivot_longer(cols = c(children, adults), names_to = "age", values_to = "value"),
-                                                 aes(x = origin_region, 
-                                                     y = value, 
-                                                     fill = age)) +
-  geom_bar(stat="identity") +
-  scale_fill_manual(values=c(unhcrPaletteBlue[1], unhcrPaletteGreen[1])) +
-  ggtitle("Age data available") +
-  labs(y = "Number of refugees")  +
-  ylim(c(NA,5000000)) +
-  theme(legend.title = element_blank(), legend.position = "bottom") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(size = 10, angle = 45),
-        axis.text.y = element_text(size = 13),
-        plot.title = element_text(hjust = 0.5),
-        axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 13),
-        panel.grid.major.x = element_blank()) 
-  
-
-
-p.oriregion.missingAge2 <- ggplot(data = t.oriregion.missingAge %>%
-                                   filter(origin_region!="Oceania", missingAge == "Age missing") ,
-                                                 aes(x = origin_region, 
-                                                     y = total)) +
-  geom_bar(stat = "identity", colour = unhcrPaletteBlue[1], fill = unhcrPaletteWhite[1], alpha = 0,
-           size = 1.6)  +
-  ggtitle("Age data missing") +
-  labs(y = "Number of refugees")  +
-  theme_minimal() +
-  theme(axis.text.x = element_text(size = 10, angle = 45),
-        axis.text.y = element_blank(),
-        plot.title = element_text(hjust = 0.5),
-        axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        panel.grid.major.x = element_blank()) +
-  scale_y_continuous(labels = label_number(scale_cut = cut_si("m")))
-  
-
-p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2+ plot_layout(guides = "collect") & theme(legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=10))  &  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()), limits = c(NA,11000000)) & theme(title = )
 
 
 # by asylum region
@@ -288,21 +228,14 @@ t.missing.asyregion <- dem_longMissing %>%
 # missingness 
 # example data
 t.missing <- dem_longMissing %>% 
-  group_by(missing) %>%
+  group_by(missingAge) %>%
   summarise(
     `Number of refugees` = sum(total),
     `Number of country pairs` = n()
   ) %>%
+    rename("Data availability" = missingAge) %>%
   mutate(`% of refugees` = round(`Number of refugees`/sum(`Number of refugees`)*100)) %>%
-  ungroup() %>% 
-    mutate(`Type of missingness` = case_when(
-      missing == "none" ~ "i) None",
-      missing == "age" ~ "ii) Age missing",
-      missing == "sexAge" ~ "iii) Age and sex missing"
-    )
-  ) %>%
-  select(`Type of missingness`, `Number of refugees`, `% of refugees`, `Number of country pairs`) %>%
-  arrange(`Type of missingness`)
+  select(`Data availability`, `Number of refugees`, `% of refugees`, `Number of country pairs`) 
 
 # t.missing %>%
 #   gt() 
@@ -311,11 +244,13 @@ t.missing <- dem_longMissing %>%
 
 ```
 
+
+## Demographic data and data gaps on refugees
 UNHCR compiles official statistics on stocks and flows of forcibly displaced and stateless persons twice a year, once for mid-year figures (Mid-Year Statistical Reporting, MYSR) and once for end-year figures (Annual Statistical Reporting, ASR). For these reporting exercises, UNHCR's country offices compile aggregate population figures for refugees and asylum-seekers hosted in their country from a range of sources and data producers such as governments, UNHCR's own refugee registration database proGres and sometimes non-governmental actors. The geographic level on which theses statistics are being produced is therefore always the country country of asylum. The figures undergo a statistical quality control process at the country, regional and global level of the organisation and are disseminated on the publicly available refugee data finder (https://www.unhcr.org/refugee-statistics/) after applying statistical disclosure control to suppress very small counts of persons that could identify individuals. The models and results presented in this paper use data only on the end-year stock of refugees under UNHCR's mandate (including Venezuelans displaced abroad, excluding Palestine refugees under UNRWA's mandate), that is, not on asylum-seekers, internally displaced persons and stateless persons. 
 
-The end-year figures compiled with reporting date 31 December contain sex- and age breakdowns of the stocks refugees under UNHCR's mandate. The data is available by country of origin and country of asylum. The variables \[sex\]\_\[agebracket\] contain the counts of refugees as of 31 December 2021 in the individual sex and age brackets in the respective geographic/stateless combination. For example, *female_12_17* contains the number of female refugees aged 12 to 17. Variable *total* is the total number of refugees over all sex/age categories.
+The end-year figures compiled with reporting date 31 December contain sex- and age breakdowns of the stocks refugees under UNHCR's mandate. The data is available by country of origin and country of asylum. The variables \[sex\]\_\[agebracket\] contain the counts of refugees as of 31 December 2021 in the individual sex and age brackets in the respective country pair. For example, *female_12_17* contains the number of female refugees aged 12 to 17. Variable *total* is the total number of refugees over all sex/age categories.
 
-Pre-defined sex-specific age brackets are 0-4, 5-11, 12-17, 18-59 and 60 years and older. For some origin/asylum combinations, only sex-disaggregated data without age information is available, and finally there are population groups for which only the total end-year count without any demographic information is available. These different levels of disaggregated data availability is recorded in variable *missing* in the dataset: "none" for populations for whom age- and sex disaggregation is available, "age" where only counts of female and male refugees are available without age information and "sexAge" for populations without any available demographic information. @tbl-data displays six rows of this dataset for illustration (age brackets other than 18-59 not shown for better readability).
+Pre-defined sex-specific age brackets are 0-4, 5-11, 12-17, 18-59 and 60 years and older. For some origin/asylum combinations however, only the total end-year count without any demographic information is available. @tbl-data displays six rows of this dataset for illustration (age brackets other than 0-4 and 5-11 not shown for better readability).
 
 ```{r, message=FALSE, warning=FALSE}
 #| label: tbl-data
@@ -324,18 +259,30 @@ Pre-defined sex-specific age brackets are 0-4, 5-11, 12-17, 18-59 and 60 years a
 #| error: false
 #| echo: false
 #| message: false
-set.seed(1840)
+set.seed(1638)
 dem_longMissing %>% 
-  filter(total > 500) %>%
-  select(origin_country, asylum_country, missing, female_18_59, female, male_18_59, male, total) %>% 
-  group_by(missing) %>%
-  slice_sample(n = 2) %>%
+  filter(total > 1000) %>%
+  select(origin_iso3, asylum_iso3, missingAge, female_0_4, female_5_11, male_0_4, male_5_11, total) %>% 
+  rename(origin = origin_iso3, asylum = asylum_iso3) %>%
+  group_by(missingAge) %>%
+  slice_sample(n = 3) %>%
   ungroup %>%
   gt() %>% 
   tab_options(table.font.size = "40%")
 ```
 
-Since reporting of official figures is undertaken at the level of the country of asylum, the reasons for missingness of age- and sex-disaggregated data in UNHCR's official statistics are located in the country - be it UNHCR's or government offices - in which refugees are hosted. This might in many countries be a lack of priority or technical capacity to produce such disaggregated figures, or in some instances unwillingness to share detailed data. 
+Since reporting of official figures is undertaken at the level of the country of asylum, the reasons for missingness of age- and sex-disaggregated data in UNHCR's official statistics are a function of statistical capacity and coordination in the country in which refugees are hosted. This might in many countries be a lack of priority or technical capacity to produce such disaggregated figures, or in some instances unwillingness to share detailed data. @tbl-missing provides an aggregate overview of missing age data in the dataset. 
+
+```{r, message=FALSE, warning=FALSE}
+#| label: tbl-missing
+#| tbl-cap: UNHCR end-2021 data
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+t.missing %>% 
+  gt()
+```
 
 @fig-missingAsy shows for what proportion of the refugee population living in each region age-disaggregated data was available at the end of 2021. While demographic coverage is close to universal for refugees hosted in Africa, it is available for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Europe", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent of refugees in Europe, `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Asia", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in Asia and only for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Americas", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in the Americas. This is to a large extent a result of the differing population data sources in these regions: While the individual demographic details of refugees in many countries in Africa and MENA are recorded in UNHCR’s own case registration system proGres, population data in other regions often comes from government offices with varying degrees of availability of demographic data.
 
@@ -372,11 +319,8 @@ p.asyregion.missing
 ```
 
 
-## Data gaps and need for modelling
+UNHCR has in the past typically reported the sex/age breakdown in the available data as global and regional aggregates of the demographic distribution of all refugees. By reporting the observed demographic distribution as the sex/age structure of the entire refugee population including the part without available data, we are assuming that the `r t.missing[t.missing$"Data availability"=="Age missing",]$"% of refugees"` per cent for whom no age information was available at the end of 2021 have the same age distribution as the ones with available data. It is difficult to check this very strong assumption of ignorability of the missing data without further information on the sex/age distribution in the missing part of the data. We can however compare the distribution of other, fully available variables between refugees with and without demographic information. If such variables can be assumed to be correlated with the sex/age distribution at least to some extent, this can give us an indication whether the ignorability assumption is likely to be justified or not.
 
-UNHCR has in the past typically reported the sex/age breakdown in the available data as global and regional aggregates of the demographic distribution of all refugees. By reporting the observed demographic distribution as the sex/age structure of the entire refugee population including the part without available data, we are assuming that the `r t.missing[t.missing$"Type of missingness"=="iii) Age and sex missing",]$"% of refugees"` per cent for whom no age information was available at the end of 2021 have the same age distribution as the ones with available data. It is difficult to check this very strong assumption of ignorability of the missing data without further information on the sex/age distribution in the missing part of the data. We can however compare the distribution of other, fully available variables between refugees with and without demographic information. If such variables can be assumed to be correlated with the sex/age distribution at least to some extent, this can give us an indication whether the ignorability assumption is likely to be justified or not.
-
-\
 In particular, we can look at the distribution of data availability by country and region of asylum, and we can furthermore compare the distribution of origins of refugees in the observed and the unobserved part of the population. If missingness of demographic data was entirely random and thus ignorable, we would expect the geographic origins of refugees to be similar in the observed and the unobserved part of the demographic data, that is, we would see a similar distribution of origin countries.
 
 ```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="120%"}
@@ -386,24 +330,110 @@ In particular, we can look at the distribution of data availability by country a
 #| error: false
 #| echo: false
 #| message: false
+p.oriregion.missingAge1 <- ggplot(data = t.oriregion.missingAge %>%
+                                   filter(origin_region!="Oceania", missingAge == "Age not missing") %>% 
+                                    pivot_longer(cols = c(children, adults), names_to = "age", values_to = "value"),
+                                                 aes(x = origin_region, 
+                                                     y = value, 
+                                                     fill = age)) +
+  geom_bar(stat="identity") +
+  scale_fill_manual(values=c(unhcrPaletteBlue[1], unhcrPaletteGreen[1])) +
+  ggtitle("Age data available") +
+  labs(y = "Number of refugees")  +
+  ylim(c(NA,5000000)) +
+  theme(legend.title = element_blank(), legend.position = "bottom") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 10, angle = 45),
+        axis.text.y = element_text(size = 13),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 13),
+        panel.grid.major.x = element_blank()) 
+  
+
+
+p.oriregion.missingAge2 <- ggplot(data = t.oriregion.missingAge %>%
+                                   filter(origin_region!="Oceania", missingAge == "Age missing") ,
+                                                 aes(x = origin_region, 
+                                                     y = total)) +
+  geom_bar(stat = "identity", colour = unhcrPaletteBlack[1], fill = unhcrPaletteWhite[1], alpha = 0,
+           size = 1, linetype = "solid")  +
+  ggtitle("Age data missing") +
+ # labs(y = "Number of refugees")  +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 10, angle = 45),
+        axis.text.y = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(size = 9),
+        axis.title.y = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_si("m")))
+  
+
+p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2 + plot_layout(guides = "collect") & theme(legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=10))  &  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()), limits = c(NA,11000000)) & theme(title = )
+
+
 p.oriregion.missingAge
 ```
 
-@fig-missingOri shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population withand without age-disaggregated data. The most common origin regions are Sub-Africa and Asia for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and Asia. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data are fundamentally different from those without such data, and that we cannot simply assume the same demographic distribution between these two groups. The varying missingness in the data across regions of origin is indirectly related to the way demographic data is more available for countries of asylum in Africa and Asia: Since 72 per cent of refugees are hosted in neighbouring countries of asylum (Global Trends 2021), it is not suprising to see better data availability not only for refugees in, but also for those from these regions.  
+@fig-missingOri shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population with and without age-disaggregated data. The most common origin regions are Sub-Africa and Asia for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and Asia. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data have different demographics from those without such data, and that we cannot simply assume the same demographic distribution between these two groups. The varying missingness in the data across regions of origin is indirectly related to the way demographic data is more available for countries of asylum in Africa and Asia: Since 72 per cent of refugees are hosted in neighbouring countries of asylum (Global Trends 2021), it is not surprising to see better data availability not only for refugees in, but also for those from these regions.  
 
 
-```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="120%"}
+
+
+The fact that the distribution of origins of refugees for whom demographic data is missing differs from those with available data would not necessarily be an issue for global and regional estimates of the poportion of children among refugees if that proportion did not differ much between countries and regions of origin. @fig-childrenOriAsy displays the proportion of children in each country of asylum (each dot is one origin/asylum population, only shown for populations of at least 500 refugees with available age-disaggregated data) for the four largest origin countries at the end of 2021. Each of the four countries of origin has its own distinct distribution of the proportion of children among refugees in different countries of asylum: Refugees from South Sudan have very high proportions of children across countries of asylum in Africa, while the percentage of children among Venezuelans residing primarily in South American countries is mostly below 30 per cent. This is not very surprising: even without seeing the data, we would expect populations from the same origin country to have at least in many cases similar demographic distributions due to the same or comparable reasons and periods of displacement and fertility patterns. There is more variability across countries of asylum for refugee populations displaced from Afghanistan. Additionally, we can observe a clustering of the proportions by region of asylum for each country of origin. For example, there is a relatively clear pattern of Syrian refugees in Asian countries having higher proportions of children than those living in African and European countries of asylum. 
+
+
+```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="150%"}
 #| label: fig-childrenOriAsy
-#| fig-cap: Proportion of children per country of asylum by country of origin
+#| fig-cap: Proportion of children among refugees in each country of asylum by country of origin (dot size is proportional to number of refugees in the country of origin/asylum pair)
 #| warning: false
 #| error: false
 #| echo: false
 #| message: false
+
+p.top4.children.ori.asy <-  ggplot(data = dem_longMissing_geoplots,
+       aes(x = origin_countryShort, y = childrenProp*100, colour = asylum_region)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteGreen[1], unhcrPaletteRed[1], unhcrPaletteBlack[1])) +
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none") +
+  labs(x = "Origin country", y="Percentage of children\nin country of asylum") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 10, angle = 0),
+        axis.text.y = element_text(size = 13),
+        axis.title.x = element_text(size = 9),
+        axis.title.y = element_text(size = 10),
+        panel.grid.major.x = element_blank()) +
+    theme(legend.title = element_text(size = 10), legend.position = "top") +
+  guides(fill = guide_legend(title.position = "top", title.hjust=0.5)) +
+    annotate("text", x = 3.6, y = 55, label = "Syrian refugees\nin Türkiye", size = 3.5) +
+    labs(colour = "Region of asylum") +
+#    theme(legend.title.align = "center") +
+  geom_curve(
+    data =   tibble(
+    x1 = c(3.6),
+    x2 = c(3.1),
+    y1 = c(50), 
+    y2 = c(45.3)), aes(x = x1, y = y1, xend = x2, yend = y2),
+    arrow = arrow(length = unit(0.08, "inch")), size = 0.6,
+    color = "gray20", curvature = -0.3)
+
  p.top4.children.ori.asy
 ```
+## Model
+Considering the findings of the descriptive analysis with considerable differences in the distribution of countries of origin and asylum between refugees with and without available data, and the explanatory power of origins and countries of asylum for the demographic characteristics of refugee populations, ignoring the missing data (i.e. treating it as if it was the same as the available data) risks introducing bias into regional and global estimates of the proportion of refugee children. In the following, we propose a model to predict counts for the age/sex brackets of those country pairs with missing demographic data (the _NAs_ in @tbl-data), which in turn will allow us to estimate regional and global proportions of children. Summarising the descriptive analysis of missingness and available age data, there are three main conclusions to be considered in predicting the proportion of children for refugee populations without available age data:  
 
+1. We cannot assume the global proportion of children among refugees for whom demographic data is available is the same as the proportion we would see if data was available for populations with currently missing data.  
+2. Knowing which country of origin refugees are from gives us some information regarding the proportion of children we would expect. For example, looking at @fig-childrenOriAsy we would generally assume that there is a higher proportion of children in a refugee population from South Sudan than in refugees from Venezuela.  
+3. For each origin population, knowing which region of asylum a population is from can help us refine the estimate for the proportion of children based on the country of origin. If we know a population is from Syria and they reside in a country of asylum in Europe, we would assume the proportion of children to be lower than if they were living in a country in Asia.    
 
-## Models
+When presented with the problem of guessing (or more formally predicting) the percentage of children among refugees in a country of asylum A from country of origin B, in the absence of any other information it would intuitively make sense to use the global proportion of children among refugees from that country for whom we have demographic data, i.e. to use data on populations from B from other countries of asylum. We can go further and only use data on refugees from B for countries of asylum in the same geographic region as A, making use of the clustering of the proportions seen in @fig-childrenOriAsy. While this procedure works for origins with a sufficient number of countries with available data in all world regions, in some cases we will encounter country pairs with missing data for which there is little or no data available for the same origin in the same region. In these cases, the next best option would be to use the global mean of the proportion of children for that origin country, or, if there is little data even across all countries of asylum, to fall back to the global mean from all origin countries. There are also going to be mix cases, where only data from a low number of countries of asylum in the same region with low population sizes is available. While we do not want to discard such data for the same origin entirely, it would make sense to additionally use data from countries of asylum in other regions for the same origin to avoid relying entirely on little and potentially unreliable data. 
+
+Multilevel models (also called hierarchical, or sometimes random effect, models) are well suited to pool information across geographic levels as described above. We fit a multilevel model with varying nested intercepts at the levels of country of origin, region of asylum and country of asylum. Since the data is available as aggregated counts in ten age/sex brackets that sum up to the population, we choose a multinomial distribution to model the underlying probabilities of a refugee falling in each of the age/sex brackets depending on their country of origin and country of asylum. When estimating these probabilities, the model treats populations from the same origin country as being more similar than to each other than those from different origins, and within each origin considers those residing in countries in the same region of asylum as more similar than those in different regions of asylum. We fit the model in a full Bayesian framework that allows us to incorporate uncertainty in parameters and in predictions from those parameters in the final predictions.
+
+The model has the form: 
+
 
 $$        $$
 
@@ -547,4 +577,4 @@ summarise(femaleMeanProp = mean(femaleProp),
 
 ```
 
-## Application example
+## Limitations and outlook
