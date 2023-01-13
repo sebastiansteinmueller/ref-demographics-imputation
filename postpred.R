@@ -15,105 +15,49 @@ library(brms)
 library(tidybayes)
 library(bayesplot)
 library(tictoc)
+library(data.table)
 
 ### read original dataset
 load("data/dem_refvda_end2021.RData")
 
 ### read brms fit objects
-m.fm <- readRDS("models/m.fm2_20230106.rds")
-m.age <- readRDS("models/m.age2_20230108.rds")
+m.ageonly <- readRDS("models/m.ageonly.rds")
+
 
 
 ##### II. Draw from posterior predictive distributions of m.fm and m.age ##### 
 
 ### posterior predictions for female and male counts
-m.fm.pred <- dem_longMissing %>%
-  filter(missing == "sexAge") %>% 
-  add_predicted_draws(m.fm,
+tic()
+m.pred <- dem_longMissing %>%
+  filter(missing %in% c("sexAge", "age")) %>% 
+  add_predicted_draws(m.ageonly,
                       allow_new_levels = T,
                       sample_new_levels = "uncertainty",
-                      ndraws = 200,
+                      ndraws = 4000,
                       seed = 2016)
-
-
-
-m.fm.pred <- m.fm.pred %>% 
-  mutate(female = .prediction) %>%
-  mutate(male = total-female) %>%
-  rename(.mfdraw = .draw) %>%
-  select(-c(.chain, .iteration, .prediction))
-
-
-
-
-# add same type ii) dataset for each imputation
-newdata.fm <- m.fm.pred %>% 
-  group_by(.mfdraw)  %>% 
-  group_modify(
-    ~ bind_rows(.x, dem_longMissing %>% 
-                  filter(missing %in% c("age"))
-    )
-  )
-
-# check that newdata adds up to totals for type ii) and iii)
-
-t.missing.newdata <- newdata.fm %>% 
-  group_by(.mfdraw, missing) %>%
-  summarise(
-    `Number of refugees` = sum(total),
-    `Number of country pairs` = n()
-  )
-
-# draw l=1 posterior predictions for age per imputation of type ii) and iii) data 
-m.age.predlist <- newdata.fm %>% 
-  group_by(.mfdraw) %>%
-  group_map(
-    ~add_predicted_draws(m.age, 
-                         newdata = .x, 
-                         allow_new_levels = T,
-                         sample_new_levels = "uncertainty",
-                         seed = 2025,
-                         ndraws = 1)
-  )
-
-# combine into dataframe with variable to indicate imputation (draw) number
-m.pred <- rbindlist(m.age.predlist, idcol = T) %>% 
-  rename(imputation = .id)
-
-# check draws and totals add up.
-t.m.pred.varcheck <- m.pred %>% 
-  group_by( origin_iso3, asylum_iso3, popType, missing) %>% 
-  summarise(n = n(), 
-            totalSd = sd(total),
-            femaleSd = sd(female),
-            maleSd = sd(male)) %>% 
-  arrange(desc(totalSd)) 
-
-summary(t.m.pred.varcheck$n)# check: should be number of imputations times ten. OK
-summary(t.m.pred.varcheck$totalSd) # check: sd of total within one country pair/datatype row and imputation should always be 0. OK
-
-t.m.pred.varcheck %>% 
-  group_by(missing) %>% 
-  summarise(femaleSdMin = min(femaleSd),
-            femaleSdMax = max(femaleSd),
-            maleSdMin = min(maleSd),
-            maleSdMax = max(maleSd)) # should all be 0 for age only missing (female/male should not vary in these rows since they are measured)
-
+toc()
 
 
 ##### III. Pivot posterior draws into imputation dataset in the same format as on UNHCR's refugee data finder ##### 
 
-
 ### pivot draws to wide format (age/sex categories as columns instead of rows) ### 
+dim(m.pred)
 m.pred.wide <- m.pred %>%
   ungroup() %>%
-  select(-c(children:missingAge, `.chain`:`.draw`)) %>%
+  select(-c(children, female_0_4:female_60, female, male, male_0_4:male_60, children:femaleProp, `.chain`:`.iteration`)) %>%
   pivot_wider(values_from = .prediction, 
               names_from = .category, 
-              id_cols = c(imputation, 
+              id_cols = c(.draw, 
                           year:missing, 
-                          female, male, 
-                          total:gni_asylum)
+                          total, asylum_sdgregion:logDistance)
+  ) %>% 
+  rename(imputation = .draw) %>% 
+  mutate(
+    female = rowSums(select(., female_0_4:female_60)),
+    male = rowSums(select(., male_0_4:male_60)),
+    children = rowSums(select(., female_0_4:female_12_17, male_0_4:male_12_17)),
+    adults = rowSums(select(., female_18_59, female_60, male_18_59, male_60))
   )
 
 ### merge type i) data with full age/sex observations to posterior draws ### 
@@ -173,7 +117,7 @@ t.imp.checkVarSummary <- t.imp.checkVar %>%
 
 imputations <- imputations_longMissing %>%
   ungroup() %>%
-  group_by(imputation, year, origin_iso3, origin_country,
+  group_by(imputation, year, asylum_sdgregion, origin_iso3, origin_country,
            asylum_iso3, asylum_country, popType) %>%
   summarise(across(c(female_0_4:female_60, female, 
                      male_0_4:male_60, male, total),
@@ -198,13 +142,15 @@ m49hcr_origin <- m49hcr %>%
 
 imputations <- imputations %>% 
   left_join(m49hcr_asylum, by = "asylum_iso3") %>% 
-  left_join(m49hcr_origin, by = "origin_iso3")
+  left_join(m49hcr_origin, by = "origin_iso3") %>% 
+  ungroup()
 dim(imputations) # OK
 
 # check whether NAs in asylum/origin variables
 
 table(imputations$asylum_country, useNA = "ifany")
 table(imputations$asylum_region, useNA = "ifany")
+table(imputations$asylum_sdgregion, useNA = "ifany")
 table(imputations$origin_country, useNA = "ifany")
 table(imputations$origin_region, useNA = "ifany")
 # all OK
@@ -212,7 +158,7 @@ table(imputations$origin_region, useNA = "ifany")
 
 ##### IV. Write files ##### 
 
-saveRDS(imputations, file =  paste0("output/imputations2", length(unique(imputations$imputation)), "_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
+saveRDS(imputations, file =  paste0("output/imputations", length(unique(imputations$imputation)), "_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
 
 
 ############################################ END ###########################################################
