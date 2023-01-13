@@ -1,0 +1,136 @@
+############################################ START ###########################################################
+
+############################################ model_age.R ################################################
+
+#### Queries: UNHCR Statistics and Demographics Section, UNICEF
+#### Project: Demographic models end-2021
+#### Description: Multinomial models for sex-specific age counts
+
+##### I. Read data, packages etc ##### 
+
+### packages
+library(tidyverse)
+library(stringi)
+library(brms)
+library(tidybayes)
+library(bayesplot)
+library(piggyback)
+
+### read dataset
+load("data/dem_refvda_end2021.RData")
+
+dem_longMissing$femaleAge  <- with(dem_longMissing, cbind(female_0_4, female_5_11, female_12_17, female_18_59, female_60))
+dem_longMissing$maleAge  <- with(dem_longMissing, cbind(male_0_4, male_5_11, male_12_17, male_18_59, male_60))
+
+##### II. Define model formulas #####
+
+f.m.femaleAge <- bf(formula =  femaleAge | trials(female) ~  (1|origin_iso3) + 
+                      (1|origin_iso3:asylum_region) + 
+                      (1|ID|origin_iso3:asylum_region:asylum_iso3) + # varying intercept
+                    neighbor,
+               family = multinomial(link = "logit", refcat = "female_18_59"),
+             center = T # intercept centered at mean of population level covariates
+)
+
+f.m.maleAge <- bf(formula =  maleAge | trials(male) ~  (1|origin_iso3) + 
+                    (1|origin_iso3:asylum_region) + 
+                    (1|ID|origin_iso3:asylum_region:asylum_iso3) +  # varying intercept
+                    neighbor,
+                  family = multinomial(link = "logit", refcat = "male_18_59"),
+                    center = T # intercept centered at mean of population level covariates
+)
+
+f.m.age <- f.m.femaleAge + f.m.maleAge + set_rescor(FALSE)
+
+##### III. Define prior distributions ##### 
+
+priors.m.age.empty <- get_prior(f.m.age,
+          data = dem_longMissing %>% 
+          filter(missing %in% c("none")))
+
+
+# WPP 2021 world frequencies for centres of population-level age group intercepts (0-4, 5-11, 12-17, 18-59, 60+ sex-specific distributions)
+wpp_female <- c(0.082948798,
+                0.117108803,
+                0.094642446,
+                0.555118782, # 18-59, reference cat
+                0.15018117)
+wpp_male <- c(0.086824115,
+              0.123420862,
+              0.09993278,
+              0.56594869, # 18-59, reference cat
+              0.123873553)
+
+stanvars.age <- stanvar(wpp_female, name = "wpp_female") + stanvar(wpp_male, name = "wpp_male")
+
+
+priors.m.age <- c(
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale04", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale511", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale1217", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mufemale60", resp = "femaleAge"),
+  prior(normal(log(0.082948798/0.555118782),1), class = Intercept, dpar = "mufemale04", resp = "femaleAge"),
+  prior(normal(log(0.117108803/0.555118782),1), class = Intercept, dpar = "mufemale511", resp = "femaleAge"),
+  prior(normal(log(0.094642446/0.555118782),1), class = Intercept, dpar = "mufemale1217", resp = "femaleAge"),
+  prior(normal(log(0.15018117/0.555118782),1), class = Intercept, dpar = "mufemale60", resp = "femaleAge"),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mufemale04", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mufemale511", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mufemale1217", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mufemale60", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mufemale04", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mufemale511", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mufemale1217", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mufemale60", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale04", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale511", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale1217", resp = "femaleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mufemale60", resp = "femaleAge", lb =0),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale04", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale511", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale1217", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = b, dpar = "mumale60", resp = "maleAge"),
+  prior(normal(log(0.086824115/0.56594869),1), class = Intercept, dpar = "mumale04", resp = "maleAge"),
+  prior(normal(log(0.123420862/0.56594869),1), class = Intercept, dpar = "mumale511", resp = "maleAge"),
+  prior(normal(log(0.09993278/0.56594869),1), class = Intercept, dpar = "mumale1217", resp = "maleAge"),
+  prior(normal(log(0.123873553/0.56594869),1), class = Intercept, dpar = "mumale60", resp = "maleAge"),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mumale04", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mumale511", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mumale1217", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region:asylum_iso3", dpar = "mumale60", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mumale04", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mumale511", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mumale1217", resp = "maleAge", lb =0),
+  prior(student_t(7,0,2.5), class = sd, group = "origin_iso3:asylum_region", dpar = "mumale60", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale04", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale511", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale1217", resp = "maleAge", lb =0),
+  prior(student_t(5,0,2.5), class = sd, group = "origin_iso3", dpar = "mumale60", resp = "maleAge", lb =0)
+)
+
+
+##### IV. Fit and save model ##### 
+
+m.age <- brm(formula = f.m.age,
+            data = dem_longMissing %>% filter(missing %in% c("none")),
+            prior = priors.m.age,
+         #   stanvars = stanvars.age,
+            init = 0,
+            sample_prior = "yes",
+            iter = 3000,
+            cores = 4,
+            control=list(adapt_delta=0.9, 
+                          max_treedepth=12),
+            seed = 1805
+            )
+saveRDS(m.age, file =  paste0("models/m.age2_", str_remove_all(as.character(Sys.Date()), "-"),".rds"))
+
+
+##### V. Model diagnostics ##### 
+
+# plot(m.age)
+# p.m.age.mcmcacf <- mcmc_acf(m.age,pars = variables(m.age)[c(1:8)]) # acf of intercept mcmcs
+# m.age.loo <- loo(m.age)
+# plot(m.age.loo)
+
+
+############################################ END ###########################################################
