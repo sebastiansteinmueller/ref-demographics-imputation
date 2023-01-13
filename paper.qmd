@@ -7,10 +7,10 @@ execute:
   warning: false
   message: false
 header-includes:
+    \usepackage{float}
     \usepackage{setspace}
     \onehalfspacing
 ---
-
 
 ```{r}
 #| include: false
@@ -33,9 +33,8 @@ library(equatiomatic)
 load("data/dem_refvda_end2021.RData")
 imputations <- readRDS("output/imputations200.rds")
 
-### read brms fit objects
-m.ageonly.rds <- readRDS("models/m.ageonly.rds")
-#m.age <- readRDS("models/m.age2_20230108.rds")
+### read brms fit object
+m.ageonly <- readRDS("models/m.ageonly.rds")
 
 ## colours (https://intranet.unhcr.org/content/dam/unhcr/intranet/staff%20support/strategic/documents/english/brand-book/UNHCR-Brand%20Book.pdf)
 unhcrPaletteBlue <- c("#0072BC", "#338EC9", "#66AAD7", "#99C7E4", "#CCE3F2")
@@ -58,8 +57,8 @@ dem_longMissing <- dem_longMissing %>%
             ),
          origin_countryShort = case_when(
               origin_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
-              origin_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
-              origin_country == "Bolivia (Plurinational State of)" ~ "UK",
+              origin_country == "United Kingdom of Great Britain and Northern Ireland" ~ "UK",
+              origin_country == "Bolivia (Plurinational State of)" ~ "Bolivia",
               origin_country == "Central African Republic" ~ "CAR",
               origin_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
               origin_country == "Lao People's Democratic Republic" ~ "Lao",
@@ -73,8 +72,8 @@ dem_longMissing <- dem_longMissing %>%
           ),
          asylum_countryShort = case_when(
               asylum_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
-              asylum_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
-              asylum_country == "Bolivia (Plurinational State of)" ~ "UK",
+              asylum_country == "United Kingdom of Great Britain and Northern Ireland" ~ "UK",
+              asylum_country == "Bolivia (Plurinational State of)" ~ "Bolivia",
               asylum_country == "Central African Republic" ~ "CAR",
               asylum_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
               asylum_country == "Lao People's Democratic Republic" ~ "Lao",
@@ -290,9 +289,11 @@ t.missing <- dem_longMissing %>%
 
 ```
 
+# Demographic data and data gaps on refugees
 
-## Demographic data and data gaps on refugees
-UNHCR compiles official statistics on stocks and flows of forcibly displaced and stateless persons twice a year, once for mid-year figures (Mid-Year Statistical Reporting, MYSR) and once for end-year figures (Annual Statistical Reporting, ASR). For these reporting exercises, UNHCR's country offices compile aggregate population figures for refugees and asylum-seekers hosted in their country from a range of sources and data producers such as governments, UNHCR's own refugee registration database proGres and sometimes non-governmental actors. The geographic level on which theses statistics are being produced is therefore always the country country of asylum. The figures undergo a statistical quality control process at the country, regional and global level of the organisation and are disseminated on the publicly available refugee data finder (https://www.unhcr.org/refugee-statistics/) after applying statistical disclosure control to suppress very small counts of persons that could identify individuals. The models and results presented in this paper use data only on the end-year stock of refugees under UNHCR's mandate (including others in need of international protection and refugee-like populations^[For better readibility, we will refer to all populations used in the data as refugees.], excluding Palestine refugees under UNRWA's mandate), that is, not on asylum-seekers, internally displaced persons and stateless persons. 
+UNHCR compiles official statistics on stocks and flows of forcibly displaced and stateless persons twice a year, once for mid-year figures (Mid-Year Statistical Reporting, MYSR) and once for end-year figures (Annual Statistical Reporting, ASR). For these reporting exercises, UNHCR's country offices compile aggregate population figures for refugees and asylum-seekers hosted in their country from a range of sources and data producers such as governments, UNHCR's own refugee registration database proGres and sometimes non-governmental actors. The geographic level on which theses statistics are being produced is therefore always the country country of asylum. The figures undergo a statistical quality control process at the country, regional and global level of the organisation and are disseminated on the publicly available refugee data finder (https://www.unhcr.org/refugee-statistics/) after applying statistical disclosure control to suppress very small counts of persons that could identify individuals. The models and results presented in this paper use data only on the end-year stock of refugees under UNHCR's mandate (including others in need of international protection and refugee-like populations[^1], excluding Palestine refugees under UNRWA's mandate), that is, not on asylum-seekers, internally displaced persons and stateless persons.
+
+[^1]: For better readability, we will refer to refugees, refugee-like populations and others in need of international protection as refugees throughout this text.
 
 The end-year figures compiled with reporting date 31 December contain sex- and age breakdowns of the stocks refugees under UNHCR's mandate. The data is available by country of origin and country of asylum. The variables \[sex\]\_\[agebracket\] contain the counts of refugees as of 31 December 2021 in the individual sex and age brackets in the respective country pair. For example, *female_12_17* contains the number of female refugees aged 12 to 17. Variable *total* is the total number of refugees over all sex/age categories.
 
@@ -317,7 +318,7 @@ dem_longMissing %>%
   tab_options(table.font.size = "40%")
 ```
 
-Since reporting of official figures is undertaken at the level of the country of asylum, the reasons for missingness of age- and sex-disaggregated data in UNHCR's official statistics are a function of statistical capacity and coordination in the country in which refugees are hosted. This might in many countries be a lack of priority or technical capacity to produce such disaggregated figures, or in some instances unwillingness to share detailed data. @tbl-missing provides an aggregate overview of missing age data in the dataset. 
+Since reporting of official figures is undertaken at the level of the country of asylum, the reasons for missingness of age- and sex-disaggregated data in UNHCR's official statistics are a function of statistical capacity and coordination in the country in which refugees are hosted. This might in many countries be a lack of priority or technical capacity to produce such disaggregated figures, or in some instances unwillingness to share detailed data. @tbl-missing provides an aggregate overview of missing age data in the dataset.
 
 ```{r, message=FALSE, warning=FALSE}
 #| label: tbl-missing
@@ -330,7 +331,7 @@ t.missing %>%
   gt()
 ```
 
-@fig-missingAsy shows for what proportion of the refugee population living in each region age-disaggregated data was available at the end of 2021. While demographic coverage is close to universal for refugees hosted in Africa, it is available for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Europe", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent of refugees in Europe, `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Asia", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in Asia and only for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Americas", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in the Americas. This is to a large extent a result of the differing population data sources in these regions: While the individual demographic details of refugees in many countries in Africa and MENA are recorded in UNHCR’s own case registration system proGres, population data in other regions often comes from government offices with varying degrees of availability of demographic data.
+@fig-missingAsy shows for what proportion of the refugee population living in each region age-disaggregated data was available at the end of 2021. While demographic coverage is close to universal for refugees hosted in Africa, it is available for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Europe", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent of refugees in Europe, `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Asia", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in Asia and only for `r round(as.numeric( t.missing.asyregion |> filter(asylum_region == "Americas", missingAge=="Age not missing") |>select(freq.totalEndYear) )*100)` per cent in the Americas. This is to a large extent a result of the differing population data sources in these regions: While the individual demographic details of refugees in many countries in Africa and MENA are recorded in UNHCR's own case registration system proGres, population data in other regions often comes from government offices with varying degrees of availability of demographic data.
 
 ```{r, message=FALSE, warning=FALSE, out.width="80%", out.height="180%"}
 #| label: fig-missingAsy
@@ -363,7 +364,6 @@ p.asyregion.missing <- ggplot(data = t.missing.asyregion %>%
 
 p.asyregion.missing
 ```
-
 
 UNHCR has in the past typically reported the sex/age breakdown in the available data as global and regional aggregates of the demographic distribution of all refugees. By reporting the observed demographic distribution as the sex/age structure of the entire refugee population including the part without available data, we are assuming that the `r t.missing[t.missing$"Data availability"=="Age missing",]$"% of refugees"` per cent for whom no age information was available at the end of 2021 have the same age distribution as the ones with available data. It is difficult to check this very strong assumption of ignorability of the missing data without further information on the sex/age distribution in the missing part of the data. We can however compare the distribution of other, fully available variables between refugees with and without demographic information. If such variables can be assumed to be correlated with the sex/age distribution at least to some extent, this can give us an indication whether the ignorability assumption is likely to be justified or not.
 
@@ -410,7 +410,7 @@ p.oriregion.missingAge2 <- ggplot(data = t.oriregion.missingAge %>%
   theme(axis.text.x = element_text(size = 10, angle = 45),
         axis.text.y = element_blank(),
         plot.title = element_text(hjust = 0.5),
-        axis.title.x = element_text(size = 9),
+        axis.title.x =  element_blank(),
         axis.title.y = element_blank(),
         panel.grid.major.x = element_blank()) +
   scale_y_continuous(labels = label_number(scale_cut = cut_si("m")))
@@ -422,13 +422,9 @@ p.oriregion.missingAge <- p.oriregion.missingAge1  + p.oriregion.missingAge2 + p
 p.oriregion.missingAge
 ```
 
-@fig-missingOri shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population with and without age-disaggregated data. The most common origin regions are Sub-Africa and Asia for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and Asia. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data have different demographics from those without such data, and that we cannot simply assume the same demographic distribution between these two groups. The varying missingness in the data across regions of origin is indirectly related to the way demographic data is more available for countries of asylum in Africa and Asia: Since 72 per cent of refugees are hosted in neighbouring countries of asylum (Global Trends 2021), it is not surprising to see better data availability not only for refugees in, but also for those from these regions.  
+@fig-missingOri shows the distribution of refugees by origin regions separately for the two subsets of the global refugee population with and without age-disaggregated data. The most common origin regions are Sub-Africa and Asia for refugees with available demographic information.Those without demographic data availability have most commonly fled from countries in the Americas and Asia. The left part of the graph shows that in the available data, the proportion of children is lower in these two regions. This provides a first indication that refugees with available sex/age-disaggregated data have different demographics from those without such data, and that we cannot simply assume the same demographic distribution between these two groups. The varying missingness in the data across regions of origin is indirectly related to the way demographic data is more available for countries of asylum in Africa and Asia: Since 72 per cent of refugees are hosted in neighbouring countries of asylum (Global Trends 2021), it is not surprising to see better data availability not only for refugees in, but also for those from these regions.
 
-
-
-
-The fact that the distribution of origins of refugees for whom demographic data is missing differs from those with available data would not necessarily be an issue for global and regional estimates of the poportion of children among refugees if that proportion did not differ much between countries and regions of origin. @fig-childrenOriAsy displays the proportion of children in each country of asylum (each dot is one origin/asylum population, only shown for populations of at least 500 refugees with available age-disaggregated data) for the four largest origin countries at the end of 2021. Each of the four countries of origin has its own distinct distribution of the proportion of children among refugees in different countries of asylum: Refugees from South Sudan have very high proportions of children across countries of asylum in Africa, while the percentage of children among Venezuelans residing primarily in South American countries is mostly below 30 per cent. This is not very surprising: even without seeing the data, we would expect populations from the same origin country to have at least in many cases similar demographic distributions due to the same or comparable reasons and periods of displacement and fertility patterns. There is more variability across countries of asylum for refugee populations displaced from Afghanistan. Additionally, we can observe a clustering of the proportions by region of asylum for each country of origin. For example, there is a relatively clear pattern of Syrian refugees in Asian countries having higher proportions of children than those living in African and European countries of asylum. 
-
+The fact that the distribution of origins of refugees for whom demographic data is missing differs from those with available data would not necessarily be an issue for global and regional estimates of the poportion of children among refugees if that proportion did not differ much between countries and regions of origin. @fig-childrenOriAsy displays the proportion of children in each country of asylum (each dot is one origin/asylum population, only shown for populations of at least 500 refugees with available age-disaggregated data) for the four largest origin countries at the end of 2021. Each of the four countries of origin has its own distinct distribution of the proportion of children among refugees in different countries of asylum: Refugees from South Sudan have very high proportions of children across countries of asylum in Africa, while the percentage of children among Venezuelans residing primarily in South American countries is mostly below 30 per cent. This is not very surprising: even without seeing the data, we would expect populations from the same origin country to have at least in many cases similar demographic distributions due to the same or comparable reasons and periods of displacement and fertility patterns. There is more variability across countries of asylum for refugee populations displaced from Afghanistan. Additionally, we can observe a clustering of the proportions by region of asylum for each country of origin. For example, there is a relatively clear pattern of Syrian refugees in Asian countries having higher proportions of children than those living in African and European countries of asylum.
 
 ```{r, message=FALSE, warning=FALSE, out.width="100%", out.height="150%"}
 #| label: fig-childrenOriAsy
@@ -467,55 +463,69 @@ p.top4.children.ori.asy <-  ggplot(data = dem_longMissing_geoplots,
 
  p.top4.children.ori.asy
 ```
-## Model
-Considering the findings of the descriptive analysis with considerable differences in the distribution of countries of origin and asylum between refugees with and without available data, and the explanatory power of origins and countries of asylum for the demographic characteristics of refugee populations, ignoring the missing data (i.e. treating it as if it was the same as the available data) risks introducing bias into regional and global estimates of the proportion of refugee children. In the following, we propose a model to predict counts for the age/sex brackets of those country pairs with missing demographic data (the _NAs_ in @tbl-data), which in turn will allow us to estimate regional and global proportions of children. Summarising the descriptive analysis of missingness and available age data, there are three main conclusions to be considered in predicting the proportion of children for refugee populations without available age data:  
 
-1. We cannot assume the global proportion of children among refugees for whom demographic data is available is the same as the proportion we would see if data was available for populations with currently missing data.  
-2. Knowing which country of origin refugees are from gives us some information regarding the proportion of children we would expect. For example, looking at @fig-childrenOriAsy we would generally assume that there is a higher proportion of children in a refugee population from South Sudan than in refugees from Venezuela.  
-3. For each origin population, knowing which region of asylum a population is from can help us refine the estimate for the proportion of children based on the country of origin. If we know a population is from Syria and they reside in a country of asylum in Europe, we would assume the proportion of children to be lower than if they were living in a country in Asia.    
+@fig-childrenDist shows the proportion of children as a function of the distance between country of origin and country of asylum for the nine largest refugee producing countries. Dots for countries of asylum that neighbour the respective origin country are blue. The proportion of children by and large decreases for countries of asylum that are further away, and it is higher for neighbouring countries.
 
-When presented with the task of predicting the percentage of children among refugees in a country of asylum A from country of origin B, in the absence of any other information it would intuitively make sense to use the global proportion of children among refugees from that country for whom we have demographic data, i.e. to use data on populations from B from other countries of asylum. We can go further and only use data on refugees from B for countries of asylum in the same geographic region as A, making use of the clustering of proportions seen in @fig-childrenOriAsy. While this procedure works for origins with a sufficient number of countries with available data in all world regions, in some cases we will encounter country pairs with missing data for which there is little or no data available for the same origin in the same region. In these cases, the next best option would be to use the global mean of the proportion of children for that origin country, or, if there is little data even across all countries of asylum, to fall back to the global mean from all origin countries. There are also going to be mix cases, where only data from a low number of countries of asylum in the same region with low population sizes is available. While we do not want to discard such data for the same origin entirely, it would make sense to additionally use data from countries of asylum in other regions for the same origin to avoid relying entirely on little and potentially unreliable data. 
+```{r, message=FALSE, warning=FALSE}
+#| label: fig-childrenDist
+#| fig-cap: Proportion of children among refugees for nine large refugee origins by distance to country of asylum (dot size is proportional to number of refugees in the country of origin/asylum pair)
+#| fig-height: 11
+#| fig-width: 8
+#| out-width: "100%"
+#| out-height: "100%"
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
 
-Multilevel models (also called hierarchical, or sometimes random effect, models) are well suited to pool information across geographic levels as described above. We fit a multilevel model with varying nested intercepts at the levels of country of origin, region of asylum and country of asylum. Since the data is available as aggregated counts in ten age/sex brackets that sum up to the population total, we choose a multinomial distribution to model the underlying probabilities of a refugee falling in each of the age/sex brackets depending on their country of origin and country of asylum. When estimating these probabilities, the model treats populations from the same origin country as being more similar to each other than those from different origins, and within each origin considers those residing in countries in the same region of asylum as more similar than those in different regions of asylum. We fit the model in a full Bayesian framework that allows us to incorporate uncertainty in parameters and in predictions from those parameters in the final predictions.
+p.children.logdist <- ggplot(data = dem_longMissing_plots,
+       aes(x = logDistance, y = childrenProp*100, colour = neighbor)) +
+  geom_point(shape = 19, aes(size = total, alpha = 0.3)) +  # Add points to the plot
+  scale_color_manual(values = c(unhcrPaletteBlue[3], unhcrPaletteBlack[1])) +
+  facet_wrap(~ origin_country, scales = "free_x") + # Group the data by origin_iso3
+  scale_size(guide = "none") +
+  scale_alpha(guide = "none") +
+  labs(x = "Distance (log)", y="Percentage of children\nin country of asylum", colour = "Neighbouring\ncountry") +
+#  theme_minimal() +
+  theme(axis.text.x = element_text(size = 10, angle = 0),
+        axis.text.y = element_text(size = 13),
+        axis.title.x = element_text(size = 9),
+        axis.title.y = element_text(size = 10),
+        panel.grid.major.x = element_blank()) +
+    theme(legend.title = element_text(size = 10), legend.position = "bottom") 
 
-For each refugee population $i$ with a total of $n_{i}$ people from country of origin $c$ in country of asylum $a$ in region $r$, we want to predict the vector of counts in the ten age/sex brackets $y_{i} = (y_{1,i},...,y_{k,i},...y_{10,i})$ ($y_{1,i}$ is the count of girls in the 0-4 age bracket, $y_{2,i}$ are girls in the 5-11 bracket, $y_{5,i}$ are women aged 60 and older, $y_{6,i}$ are boys aged 0-4 and so on). $y_{i}$ follows a multinomial distribution:
-$$y_{i}\sim M(n_{i},\pi_{i})$$ {#eq-multinomial}
-We fit a multilevel multinomial logit model to estimate from observed age/sex data the vector of probabilities $\pi_{i} = (\pi_{1,i},...,\pi_{k,i},...\pi_{10,i})$ expressing the probability of a refugee falling in age/sex bracket $k$ given their country of origin, country and region of asylum and whether they live in a country neighbouring their origin country:
-$$log(\frac{\pi_{k,i}}{\pi_{4,i}}) = \eta_{k,i} = \beta_{k,0}+\beta_{k,neighbor}+b_{k,c}+b_{k,r}+b_{k,a}$$ {#eq-linpred}
-where the counts of the 4th age/sex bracket, women aged 18-59, are the reference category (therefore $\pi_{4,i}$ in the logit denominator). The $\pi_{k}$ sum up to one:
-$$\sum_{k=1}^{10}\pi_{k,i}=1$$ {#eq-simplex}
-We use the following priors for the model parameters, where $\Pi_{k}$ is the proportion of the global population in that age/sex group in 2021 (World Population Prospects 2022):
-$$\beta_{k,0}\sim N(log(\frac{\Pi_{k}}{\Pi_{4}}),1)$$ {#eq-beta0}
-$$\beta_{k,neighbor}\sim t(7,0,2.5)$$ {#eq-beta1}
-$$sd(b_{k,c})\sim t(5,0,2.5)$$ {#eq-sdCoO}
-$$sd(b_{k,r})\sim t(7,0,2.5)$$ {#eq-sdRoA}
-$$sd(b_{k,a})\sim N(0,0.01)$$ {#eq-sdCoA}
+ p.children.logdist
+```
 
-The prior on the global intercepts with the $log(\frac{\Pi_{k}}{\Pi_{4}})$ mean aims to provide sensible levels for the age/sex bracket proportions. It incorporates our prior belief that, for example, it is unlikely that all refugees in a country are girls aged 0 to 4, but otherwise is not overly narrow.
-The student-t priors on the group-level standard deviations of the intercepts of country of origin and region of asylum are not informative and only serve to regularise the parameter space. The prior on country of origin is slightly wider to allow less pooling (i.e. closer to a separate model for each country of origin) and thereby take into consideration the general idea of the model that age/sex distributions are idiosyncratic to populations of an origin country. 
-The very narrow $N(0,0.01)$ prior on standard deviation of the country of asylum term $b_{k,a}$ merits further discussion: Including the term might seem unusual to start with since in most cases there is only one observation in the form of age/sex counts and total (i.e. one row in the dataset) per country of origin/asylum to start with (exception are countries in Latin America and the Caribbean with two populations displaced from Venezuela, refugees and others in need of international protection). On one hand, leaving out this parameter leads to overconfidence in predicting counts in country pairs with missing data since in that case the counts are drawn from the varying intercepts of the regions (which are observed in the data in  most country of origin/region of asylum pairs), ignoring the uncertainty that comes with predicting a whole new country pair not used in fitting the model. On the other hand, allowing a wider standard deviation leads to unreasonably wide prediction intervals (sometimes including counts of zero children in populations of several thousand refugees). Restricting the prior by way of a very small standard deviation helps us constrain the predictive intervals to sensible ranges. 
+# Model
 
-To predict the count vector of age/sex brackets $\tilde{y_{i^{*}}}$ for a country pair $i^{*}$ without reported data and account for uncertainty of parameters $\theta$ and prediction, we draw for each country pair with missing data $m$ values from the posterior predictive distributions:
-$$p(\tilde{y_{i^{*}}} \mid y)
+Considering the findings of the descriptive analysis with considerable differences in the distribution of countries of origin and asylum between refugees with and without available data, and the explanatory power of origins and countries of asylum for the demographic characteristics of refugee populations, ignoring the missing data (i.e. treating it as if it was the same as the available data) risks introducing bias into regional and global estimates of the proportion of refugee children. In the following, we propose a model to predict counts for the age/sex brackets of those country pairs with missing demographic data (the *NAs* in @tbl-data), which in turn will allow us to estimate regional and global proportions of children. Summarising the descriptive analysis of missingness and available age data, there are three main conclusions to be considered in predicting the proportion of children for refugee populations without available age data:
+
+1.  We cannot assume the global proportion of children among refugees for whom demographic data is available is the same as the proportion we would see if data was available for populations with currently missing data.\
+2.  Knowing which country of origin refugees are from gives us some information regarding the proportion of children we would expect. For example, looking at @fig-childrenOriAsy we would generally assume that there is a higher proportion of children in a refugee population from South Sudan than in refugees from Venezuela.\
+3.  For each origin population, knowing which region of asylum a population is from can help us refine the estimate for the proportion of children based on the country of origin. If we know a population is from Syria and they reside in a country of asylum in Europe, we would assume the proportion of children to be lower than if they were living in a country in Asia.
+
+When presented with the task of predicting the percentage of children among refugees in a country of asylum A from country of origin B, in the absence of any other information it would intuitively make sense to use the global proportion of children among refugees from that country for whom we have demographic data, i.e. to use data on populations from B from other countries of asylum. We can go further and only use data on refugees from B for countries of asylum in the same geographic region as A, making use of the clustering of proportions seen in @fig-childrenOriAsy. While this procedure works for origins with a sufficient number of countries with available data in all world regions, in some cases we will encounter country pairs with missing data for which there is little or no data available for the same origin in the same region. In these cases, the next best option would be to use the global mean of the proportion of children for that origin country, or, if there is little data even across all countries of asylum, to fall back to the global mean from all origin countries. There are also going to be mix cases, where only data from a low number of countries of asylum in the same region with low population sizes is available. While we do not want to discard such data for the same origin entirely, it would make sense to additionally use data from countries of asylum in other regions for the same origin to avoid relying entirely on little and potentially unreliable data.
+
+Multilevel models (also called hierarchical, or sometimes random effect, models) are well suited to pool information across geographic levels as described above. We fit a multilevel model with varying nested intercepts at the levels of country of origin, region of asylum and country of asylum. Since the data is available as aggregated counts in ten age/sex brackets that sum up to the population total, we choose a multinomial distribution to model the underlying probabilities of a refugee falling in each of the age/sex brackets depending on their country of origin and country of asylum. When estimating these probabilities, the model treats populations from the same origin country as being more similar to each other than those from different origins, and for each origin considers those residing in countries in the same region of asylum as more similar than those in different regions of asylum. We fit the model in a Bayesian framework that allows us to incorporate uncertainty in parameters and in predictions from those parameters in the final predictions.
+
+For each refugee population $i$ with a total of $n_{i}$ people from country of origin $c$ in country of asylum $a$ in region $r$, we want to predict the vector of counts in the ten age/sex brackets $y_{i} = (y_{1,i},...,y_{k,i},...y_{10,i})$ ($y_{1,i}$ is the count of girls in the 0-4 age bracket, $y_{2,i}$ are girls in the 5-11 bracket, $y_{5,i}$ are women aged 60 and older, $y_{6,i}$ are boys aged 0-4 and so on). $y_{i}$ follows a multinomial distribution: $$y_{i}\sim M(n_{i},\pi_{i})$$ {#eq-multinomial} We fit a multilevel multinomial logit model to estimate from observed age/sex data the vector of probabilities $\pi_{i} = (\pi_{1,i},...,\pi_{k,i},...\pi_{10,i})$ expressing the probability of a refugee falling in age/sex bracket $k$ given their country of origin, country and region of asylum and whether they live in a country neighbouring their origin country: $$log(\frac{\pi_{k,i}}{\pi_{4,i}}) = \eta_{k,i} = \beta_{k,0}+\beta_{k,neighbor}+b_{k,c}+b_{k,r}+b_{k,a}$$ {#eq-linpred} where the counts of the 4th age/sex bracket, women aged 18-59, are the reference category (therefore $\pi_{4,i}$ in the logit denominator). The $\pi_{k}$ sum up to one: $$\sum_{k=1}^{10}\pi_{k,i}=1$$ {#eq-simplex} We use the following priors for the model parameters, where $\Pi_{k}$ is the proportion of the global population in that age/sex group in 2021 (World Population Prospects 2022): $$\beta_{k,0}\sim N(log(\frac{\Pi_{k}}{\Pi_{4}}),1)$$ {#eq-beta0} $$\beta_{k,neighbor}\sim t(7,0,2.5)$$ {#eq-beta1} $$sd(b_{k,c})\sim t(5,0,2.5)$$ {#eq-sdCoO} $$sd(b_{k,r})\sim t(7,0,2.5)$$ {#eq-sdRoA} $$sd(b_{k,a})\sim N(0,0.01)$$ {#eq-sdCoA}
+
+The prior on the global intercepts with the $log(\frac{\Pi_{k}}{\Pi_{4}})$ mean aims to provide sensible levels for the age/sex bracket proportions. It incorporates our prior belief that, for example, it is unlikely that all refugees in a country are girls aged 0 to 4, but otherwise is not overly narrow. The student-t priors on the group-level standard deviations of the intercepts of country of origin and region of asylum are not informative and only serve to regularise the parameter space. The prior on country of origin is slightly wider to allow less pooling (i.e. closer to a separate model for each country of origin) and thereby take into consideration the general idea of the model that age/sex distributions are idiosyncratic to populations of an origin country. The very narrow $N(0,0.01)$ prior on standard deviation of the country of asylum term $b_{k,a}$ merits further discussion: Including the term might seem unusual to start with since in most cases there is only one observation in the form of age/sex counts and total (i.e. one row in the dataset) per country of origin/asylum to start with (exception are countries in Latin America and the Caribbean with two populations displaced from Venezuela, refugees and others in need of international protection). On one hand, leaving out this parameter leads to overconfidence in predicting counts in country pairs with missing data since in that case the counts are drawn from the varying intercepts of the regions (which are observed in the data in most country of origin/region of asylum pairs), ignoring the uncertainty that comes with predicting a whole new country pair not used in fitting the model. On the other hand, allowing a wider standard deviation leads to unreasonably wide prediction intervals (sometimes including counts of zero children in populations of several thousand refugees). Restricting the prior by way of a very small standard deviation helps us constrain the predictive intervals to sensible ranges. We include a fixed effect for neighbouring country pairs since @fig-childrenDist shows that we can on average expect higher proportions of children among refugee populations in neighbouring countries of asylum. 
+
+To predict the count vector of age/sex brackets $\tilde{y_{i^{*}}}$ for a country pair $i^{*}$ without reported data and account for uncertainty of parameters $\theta$ and prediction, we draw for each country pair with missing data $m$ values from the posterior predictive distributions: $$p(\tilde{y_{i^{*}}} \mid y)
 = 
 \int p(\tilde{y_{i^{*}}} \mid \theta) \cdot p(\theta \mid y)
-\, \textrm{d}\theta$$
+\, \textrm{d}\theta$$ {#eq-postpred}
 
-We can then analyse the $m$ posterior draws $y_{j,i^{*}}$ ($j=1,...,m$) descriptively and calculate for example uncertainty intervals and location parameters to estimate regional and global proportions of age groups such as children. We will call each of the $m$ draws of values for the missing part of the dataset an imputation. 
+We can then analyse the $m$ posterior draws $y_{j,i^{*}}$ ($j=1,...,m$) descriptively and calculate for example uncertainty intervals and location parameters to estimate regional and global proportions of age groups such as children. We will call each of the $m$ draws of values for the missing part of the dataset an imputation.
 
-The model was fit with the R-package brms. Reproducible code is available at https://github.com/sebastiansteinmueller/ref-demographics-imputation/. 
+The model was fit with R-package brms. Reproducible code is available [here](https://github.com/sebastiansteinmueller/ref-demographics-imputation/){.external target="_blank"}. Annex I contains the model summaries. 
 
-
-## Results
+# Results
 
 ```{r}
-##### check predictions ##### 
-
-imputations <- imputations %>% 
-  ungroup() %>%
-  mutate(femaleProp = female/total,
-         children = rowSums(select(., female_0_4, female_5_11, female_12_17, male_0_4, male_5_11, male_12_17))) %>% 
-  mutate(childrenProp = children/total)
+##### predictions ##### 
 
 
 ### by country of origin
@@ -560,28 +570,12 @@ p.imputations.syr.reg.female <- ggplot(data = imputations.syr,
   facet_wrap(~ asylum_region, scales = "fixed")
 
 
-p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",    "LBN", "JOR", "GBR")),
-      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
-     stat_halfeye() +
-  theme_minimal()
 
-p.imputations.syr.reg.children <- ggplot(data = imputations.syr,
-      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
-     stat_gradientinterval() +
-  facet_wrap(~ asylum_region, scales = "free")
 
-p.imputations.syr.neighbour.children <- ggplot(data = imputations.syr,
-      aes(y=reorder(asylum_country, childrenProp), x=childrenProp)) +
-     stat_gradientinterval() +
-  facet_wrap(~ neighbor, scales = "free")
 
 
 ### by region of asylum
-t.dem.asyreg.children <- dem_longMissing %>% 
-  filter(!is.na(children)) %>%
-  group_by(asylum_region) %>% 
-  summarise(children = sum(children), total = sum(total)) %>% 
-  mutate(childrenProp = children/total)
+
 
 t.dem.asyreg.female <- dem_longMissing %>% 
   filter(!is.na(female)) %>%
@@ -597,41 +591,25 @@ imputations.asyreg <- imputations %>%
          femaleProp = female/total) %>% 
   ungroup()
 
-t.imp.asyreg.children <- imputations.asyreg %>% 
-  group_by(asylum_region) %>% 
-  summarise(childrenMeanProp = mean(childrenProp), 
-            lowerUI = quantile(childrenProp, probs = 0.025), 
-            upperUI = quantile(childrenProp, probs = 0.975)
-            ) %>% 
-  left_join(t.dem.asyreg.children %>% select(asylum_region, childrenProp), by = "asylum_region", suffix = c(".imputed", ".availableData"))
+
 
 t.imp.asyreg.female <- imputations.asyreg %>% 
   group_by(asylum_region) %>% 
   summarise(femaleProp = mean(femaleProp), lowerUI = quantile(femaleProp, probs = 0.025), upperUI = quantile(femaleProp, probs = 0.975)) %>% 
   left_join(t.dem.asyreg.female %>% select(asylum_region, femaleProp), by = "asylum_region", suffix = c(".imputed", ".availableData"))
 
+## Venezuela 
+imputations.ven <- imputations %>% 
+  filter(origin_iso3 == "VEN") 
+
 
 ### world
-t.dem.children <- dem_longMissing %>% 
-  filter(!is.na(children)) %>%
-  summarise(children = sum(children), total = sum(total)) %>% 
-  mutate(childrenProp = children/total)
 
 t.dem.female <- dem_longMissing %>% 
   filter(!is.na(female)) %>%
   summarise(female = sum(female), total = sum(total)) %>% 
   mutate(femaleProp = female/total)
 
-t.imp.children <- imputations %>% 
-  group_by(imputation) %>% 
-  summarise(children = sum(children), female = sum(female), total = sum(total)) %>% 
-  mutate(childrenProp = children/total,
-         femaleProp = female/total) %>% 
-  ungroup() %>%
-summarise(childrenMeanProp = mean(childrenProp), 
-              lowerUI = quantile(childrenProp, probs = 0.025), 
-              upperUI = quantile(childrenProp, probs = 0.975)
-    )
 
 t.imp.female <- imputations %>% 
   group_by(imputation) %>% 
@@ -646,4 +624,193 @@ summarise(femaleMeanProp = mean(femaleProp),
 
 ```
 
-## Limitations and outlook
+## Global and regional estimates
+
+```{r, message=FALSE, warning=FALSE}
+#| label: tbl-estimates
+#| tbl-cap: Regional and global model estimates for the proportion of children
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+
+t.dem.asyreg.children <- dem_longMissing %>% 
+  filter(!is.na(children)) %>%
+  group_by(asylum_region) %>% 
+  summarise(children = sum(children), total = sum(total)) %>% 
+  mutate(childrenProp = children/total)
+
+t.imp.asyreg.children <- imputations.asyreg %>% 
+  group_by(asylum_region) %>% 
+  summarise(childrenMeanProp = mean(childrenProp), 
+            lowerUI = quantile(childrenProp, probs = 0.025), 
+            upperUI = quantile(childrenProp, probs = 0.975)
+            ) %>% 
+  left_join(t.dem.asyreg.children %>% select(asylum_region, childrenProp), by = "asylum_region", suffix = c(".imputed", ".availableData")) 
+
+
+t.dem.children <- dem_longMissing %>% 
+  filter(!is.na(children)) %>%
+  summarise(children = sum(children), total = sum(total)) %>% 
+  mutate(childrenProp = children/total)
+
+
+t.imp.children <- imputations %>% 
+  group_by(imputation) %>% 
+  summarise(children = sum(children), female = sum(female), total = sum(total)) %>% 
+  mutate(childrenProp = children/total,
+         femaleProp = female/total) %>% 
+  ungroup() %>%
+summarise(childrenMeanProp = mean(childrenProp), 
+              lowerUI = quantile(childrenProp, probs = 0.025), 
+              upperUI = quantile(childrenProp, probs = 0.975)
+    )
+
+
+t.world.children <- tibble(
+  asylum_region = "WORLD",
+  childrenMeanProp = t.imp.children$childrenMeanProp,
+  lowerUI = t.imp.children$lowerUI,
+  upperUI = t.imp.children$upperUI,
+  childrenProp = t.dem.children$childrenProp
+)
+
+
+t.worldregion.children <- bind_rows(t.imp.asyreg.children, t.world.children) %>%
+  select(asylum_region, childrenProp, childrenMeanProp, lowerUI, upperUI) %>% 
+  mutate(across(where(is.double),~.*100 ))
+
+t.worldregion.children %>% 
+  gt() %>%
+  fmt_number(columns = 2:5, decimals = 1) %>%
+  tab_options(table.font.size = "40%") %>%
+  cols_label(asylum_region = md("Region<br>of asylum"),
+         childrenProp=  md("Percentage of<br>children in<br>available data"),
+        childrenMeanProp =md("Estimated<br>percentage with<br>imputed data" ) ,
+       lowerUI  =md("Lower 95%<br>uncertainty") ,
+        upperUI =md("Upper 95%<br>uncertainty"))
+
+```
+
+@tbl-estimates shows the percentage of children among refugees living in the five major world regions estimated with imputations from the model and compares them to the percentage we obtain using the available data only. The global estimate for the proportion of children drops by almost 5 per cent, from 47 per cent to 42 per cent, when using the imputed dataset. The 95% uncertainty interval for the global point estimate ranges from 41.7 to 42.9 per cent and does not include the available-data figure of 47 per cent. This indicates the standardisation by origins and regions of asylum through the model is relevant, and previously disseminated figures for the proportion of refugees who are children were most likely overestimates. 
+Regional estimates from the imputed data are below the available-data figures with narrow uncertainty intervals for all regions apart from Oceania. The available-data figures are based on 1209 refugees with reported data. The model pools the low estimate from this small dataset towards the global means.   
+
+
+
+## Uncertainty checks for country level predictions
+
+To assess whether the model estimates uncertainty sensibly, we can look at the range of predictions at country level. @fig-impChildSyr shows the distribution of the proportion of children over the 200 imputed datasets among Syrian refugees in four countries of asylum without reported data. The posterior predictive distributions are relatively wide, with the 95% posterior predictive interval for the proportion of children among Syrians in the USA ranging from 15 per cent to 43 per cent. This is a desirable property of the models since, in the absence of reported data on an origin population in a country of asylum, we would not be confident in overly narrow prediction intervals. For this reason, the model output should generally not be used on country level, and never to estimate point intervals on the level of a country of asylum. 
+
+```{r, fig.pos = "H"}
+#| label: fig-impChildSyr
+#| fig-cap: Uncertainty in posterior predictive distribution of the proportion of children among Syrian refugees in four countries of asylum
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+
+p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",    "GBR", "GRC")),
+      aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
+     stat_slab() +
+  labs(x = "Proportion of children") +
+  theme_minimal() +
+    theme(axis.text.x = element_text(size = 11, angle = 0),
+        axis.text.y = element_text(size = 11),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_blank(),
+        panel.grid.major.y = element_blank())
+  
+p.imputations.syr.children
+```
+
+@fig-impChildVen shows the same plot for Venezuelans in four South American countries. The distributions for the proportion of children among Venezuelans in Ecuador and Argentina are much narrower than for those in Brazil and Chile, or for Syrians in any of the countries shown above. In contrast to many other countries, demographic data is available in Argentina and Ecuador for some Venezuelan populations, leading to narrower prediction range in these countries.  
+
+```{r, fig.pos = "H"}
+#| label: fig-impChildVen
+#| fig-cap: Uncertainty in posterior predictive distribution of the proportion of children among Venezuelan refugees in four countries of asylum
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+
+p.imputations.ven.children <- ggplot(data = imputations.ven %>% filter(asylum_iso3 %in% c("ARG", "ECU", "CHL", "BRA"), popType=="VDA"),
+      aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
+     stat_slab() +
+  labs(x = "Proportion of children") +
+  theme_minimal() +
+    theme(axis.text.x = element_text(size = 11, angle = 0),
+        axis.text.y = element_text(size = 11),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_blank(),
+        panel.grid.major.y = element_blank())
+  
+p.imputations.ven.children
+```
+
+@fig-impChildSyrReg shows the distribution of reported (point only) and predicted (intervals) proportions of children among Syrian refugees in all countries by world region. Demographic data is reported from all countries in Africa and there is consequently no uncertainty in data from these countries. In Oceania in contrast, no data was reported at all, leading to very large uncertainty intervals for Australia and New Zealand.
+
+```{r, fig.pos = "H"}
+#| label: fig-impChildSyrReg
+#| fig-cap: Uncertainty in posterior predictive distribution of the proportion of children among Syrian refugees across regions
+#| fig-height: 13
+#| fig-width: 9
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+p.imputations.syr.reg.children <- ggplot(data = imputations.syr,
+      aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
+     stat_pointinterval() +
+  labs(x = "Proportion of children") +
+  theme_minimal() +
+    theme(axis.text.x = element_text(size = 13, angle = 0),
+        axis.text.y = element_blank(),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_blank(),
+        panel.grid.major.y = element_blank()) +
+    facet_wrap(~ asylum_region, scales = "free", ncol = 2) +
+  theme(strip.text = element_text(size = 16))
+  
+
+
+p.imputations.syr.reg.children
+
+```
+
+
+# Limitations
+
+While the imputed dataset is useful in estimating regional and global estimates of the age/sex distribution of refugees, it cannot substitute data collected and compiled for and at the national level. Estimates from the imputed dataset should always be disseminated and communicated with uncertainty intervals, and using the imputed data to derive country-level estimates is not recommended. The modelling approach is top-down and simply uses geographic proximity as a means to improve available-data figures. Promising improvements would be to use multi-year data and incorporate components of population change to obtain more reliable estimates. 
+
+
+# Annex I: Model output
+```{r}
+#| label: tbl-model_fixed
+#| tbl-cap: Model - fixed effects
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+m.ageonly.sum <- summary(m.ageonly)
+m.ageonly.ranefsum <- t(m.ageonly.sum$random %>% as_tibble() )
+colnames(m.ageonly.ranefsum) <- c("female_0_4", "female_5_11" , "female_12_17" , "female_60" ,
+                                  "male_0_4"  ,               "male_5_11"   ,            
+"male_12_17"     ,          "male_18_59"     ,          "male_60")
+
+m.ageonly.ranefsum <- m.ageonly.ranefsum %>% 
+  as.data.frame() %>% 
+  rownames_to_column() %>% 
+  rename(`Group and summary`=rowname)
+
+m.ageonly.fixedsum <- m.ageonly.sum$fixed 
+
+m.ageonly.fixedsum %>% gt()
+
+
+ 
+ 
+
+```
+  
+
+  
