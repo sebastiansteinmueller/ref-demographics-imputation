@@ -98,8 +98,8 @@ imputations <- imputations %>%
           femaleProp = female/total,
           origin_countryShort = case_when(
               origin_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
-              origin_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
-              origin_country == "Bolivia (Plurinational State of)" ~ "UK",
+              origin_country == "United Kingdom of Great Britain and Northern Ireland" ~ "UK",
+              origin_country == "Bolivia (Plurinational State of)" ~ "Bolivia",
               origin_country == "Central African Republic" ~ "CAR",
               origin_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
               origin_country == "Lao People's Democratic Republic" ~ "Lao",
@@ -113,8 +113,8 @@ imputations <- imputations %>%
           ),
          asylum_countryShort = case_when(
               asylum_country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela" ,
-              asylum_country == "United Kingdom of Great Britain and Northern Ireland" ~ "Bolivia",
-              asylum_country == "Bolivia (Plurinational State of)" ~ "UK",
+              asylum_country == "United Kingdom of Great Britain and Northern Ireland" ~ "UK",
+              asylum_country == "Bolivia (Plurinational State of)" ~ "Bolivia",
               asylum_country == "Central African Republic" ~ "CAR",
               asylum_country == "China, Hong Kong Special Administrative Region" ~ "Hong Kong",
               asylum_country == "Lao People's Democratic Republic" ~ "Lao",
@@ -336,6 +336,8 @@ t.missing %>%
 ```{r, message=FALSE, warning=FALSE, out.width="80%", out.height="180%"}
 #| label: fig-missingAsy
 #| fig-cap: Missingness by region of asylum
+#| fig-height: 6
+#| fig-width: 6
 #| warning: false
 #| error: false
 #| echo: false
@@ -684,12 +686,37 @@ t.worldregion.children %>%
   gt() %>%
   fmt_number(columns = 2:5, decimals = 1) %>%
   tab_options(table.font.size = "40%") %>%
-  cols_label(asylum_region = md("Region<br>of asylum"),
-         childrenProp=  md("Percentage of<br>children in<br>available data"),
-        childrenMeanProp =md("Estimated<br>percentage with<br>imputed data" ) ,
-       lowerUI  =md("Lower 95%<br>uncertainty") ,
-        upperUI =md("Upper 95%<br>uncertainty"))
+  cols_label(asylum_region = md("Region"),
+         childrenProp=  md("% available data"),
+        childrenMeanProp =md("% estimated" ) ,
+       lowerUI  =md("Lower 95% CI") ,
+        upperUI =md("Upper 95% CI")) %>% 
+    tab_style(
+    style = cell_borders(
+      sides = c("right"),
+      color = "	#c1cdcd",
+      weight = 0.7,
+      style = "dashed"
+    ),
+    locations = cells_body(
+      columns = 2,
+      rows = everything()
+    )
+  ) %>% 
+    tab_style(
+    style = cell_borders(
+      sides = c("right"),
+      color = "	#c1cdcd",
+      weight = 0.7,
+      style = "dashed"
+    ),
+locations = cells_column_labels(
+      columns = 2
+    )
+  )
 
+
+    
 ```
 
 @tbl-estimates shows the percentage of children among refugees living in the five major world regions estimated with imputations from the model and compares them to the percentage we obtain using the available data only. The global estimate for the proportion of children drops by almost 5 per cent, from 47 per cent to 42 per cent, when using the imputed dataset. The 95% uncertainty interval for the global point estimate ranges from 41.7 to 42.9 per cent and does not include the available-data figure of 47 per cent. This indicates the standardisation by origins and regions of asylum through the model is relevant, and previously disseminated figures for the proportion of refugees who are children were most likely overestimates. 
@@ -712,7 +739,7 @@ To assess whether the model estimates uncertainty sensibly, we can look at the r
 p.imputations.syr.children <- ggplot(data = imputations.syr %>% filter(asylum_iso3 %in% c("SWE", "USA",    "GBR", "GRC")),
       aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
      stat_slab() +
-  labs(x = "Proportion of children") +
+  labs(x = "Percentage of children") +
   theme_minimal() +
     theme(axis.text.x = element_text(size = 11, angle = 0),
         axis.text.y = element_text(size = 11),
@@ -736,7 +763,7 @@ p.imputations.syr.children
 p.imputations.ven.children <- ggplot(data = imputations.ven %>% filter(asylum_iso3 %in% c("ARG", "ECU", "CHL", "BRA"), popType=="VDA"),
       aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
      stat_slab() +
-  labs(x = "Proportion of children") +
+  labs(x = "Percentage of children") +
   theme_minimal() +
     theme(axis.text.x = element_text(size = 11, angle = 0),
         axis.text.y = element_text(size = 11),
@@ -761,7 +788,7 @@ p.imputations.ven.children
 p.imputations.syr.reg.children <- ggplot(data = imputations.syr,
       aes(y=reorder(asylum_countryShort, childrenProp), x=childrenProp*100)) +
      stat_pointinterval() +
-  labs(x = "Proportion of children") +
+  labs(x = "Percentage of children") +
   theme_minimal() +
     theme(axis.text.x = element_text(size = 13, angle = 0),
         axis.text.y = element_blank(),
@@ -792,25 +819,68 @@ While the imputed dataset is useful in estimating regional and global estimates 
 #| echo: false
 #| message: false
 m.ageonly.sum <- summary(m.ageonly)
-m.ageonly.ranefsum <- t(m.ageonly.sum$random %>% as_tibble() )
-colnames(m.ageonly.ranefsum) <- c("female_0_4", "female_5_11" , "female_12_17" , "female_60" ,
-                                  "male_0_4"  ,               "male_5_11"   ,            
-"male_12_17"     ,          "male_18_59"     ,          "male_60")
 
-m.ageonly.ranefsum <- m.ageonly.ranefsum %>% 
-  as.data.frame() %>% 
+
+m.ageonly.fixedsum <- m.ageonly.sum$fixed  %>% 
   rownames_to_column() %>% 
-  rename(`Group and summary`=rowname)
+  select(rowname, Estimate, Est.Error, `l-95% CI`,   `u-95% CI`) %>%
+  rename(Coef = rowname)
 
-m.ageonly.fixedsum <- m.ageonly.sum$fixed 
+m.ageonly.fixedsum %>% 
+  gt() %>%
+  fmt_number(columns = 2:5, decimals = 2) 
 
-m.ageonly.fixedsum %>% gt()
-
-
- 
- 
 
 ```
   
+```{r}
+#| label: tbl-model_re1
+#| tbl-cap: Model - origin country group level standard deviation 
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+ m.ageonly.sum$random [1]$origin_iso3 %>% 
+  rownames_to_column() %>% 
+  as_tibble() %>% 
+  select(rowname, Estimate, Est.Error, `l-95% CI`,   `u-95% CI`) %>%
+  rename(Coef = rowname) %>% 
+  gt() %>%
+  fmt_number(columns = 2:5, decimals = 2) 
 
+
+```
   
+```{r}
+#| label: tbl-model_re2
+#| tbl-cap: Model - asylum region group level standard deviation 
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+ m.ageonly.sum$random [2]$`origin_iso3:asylum_sdgregion` %>% 
+  rownames_to_column() %>% 
+  as_tibble() %>% 
+  select(rowname, Estimate, Est.Error, `l-95% CI`,   `u-95% CI`) %>%
+  rename(Coef = rowname) %>% 
+  gt() %>%
+  fmt_number(columns = 2:5, decimals = 2) 
+
+```
+
+```{r}
+#| label: tbl-model_re3
+#| tbl-cap: Model - asylum country group level standard deviation 
+#| warning: false
+#| error: false
+#| echo: false
+#| message: false
+ m.ageonly.sum$random [3]$`origin_iso3:asylum_sdgregion:asylum_iso3` %>% 
+  rownames_to_column() %>% 
+  as_tibble() %>% 
+  select(rowname, Estimate, Est.Error, `l-95% CI`,   `u-95% CI`) %>%
+  rename(Coef = rowname) %>% 
+  gt() %>%
+  fmt_number(columns = 2:5, decimals = 2) 
+
+```
